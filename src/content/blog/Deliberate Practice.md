@@ -1,5 +1,5 @@
 ---
-title: '刻意练习'
+title: 'Deliberate Practice'
 description: 'About my think'
 pubDate: 'Aug 29 2025'
 ---
