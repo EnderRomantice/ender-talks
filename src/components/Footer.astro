@@ -1,12 +1,13 @@
 ---
 const today = new Date();
+import { contact } from "../config/contact"
 ---
 
 <footer>
-	&copy; {today.getFullYear()} Your name here. All rights reserved.
+	&copy; {today.getFullYear()} Ender here. All rights reserved.
 	<div class="social-links">
-		<a href="https://m.webtoo.ls/@astro" target="_blank">
-			<span class="sr-only">Follow Astro on Mastodon</span>
+		<a href={contact.mastodon} target="_blank">
+			<span class="sr-only">Follow {contact.name} on Mastodon</span>
 			<svg
 				viewBox="0 0 16 16"
 				aria-hidden="true"
@@ -19,8 +20,8 @@ const today = new Date();
 				></path></svg
 			>
 		</a>
-		<a href="https://twitter.com/astrodotbuild" target="_blank">
-			<span class="sr-only">Follow Astro on Twitter</span>
+		<a href={contact.x} target="_blank">
+			<span class="sr-only">Follow {contact.x} on Twitter</span>
 			<svg viewBox="0 0 16 16" aria-hidden="true" width="32" height="32" astro-icon="social/twitter"
 				><path
 					fill="currentColor"
@@ -28,8 +29,8 @@ const today = new Date();
 				></path></svg
 			>
 		</a>
-		<a href="https://github.com/withastro/astro" target="_blank">
-			<span class="sr-only">Go to Astro's GitHub repo</span>
+		<a href={contact.github} target="_blank">
+			<span class="sr-only">Go to {contact.name}'s GitHub repo</span>
 			<svg viewBox="0 0 16 16" aria-hidden="true" width="32" height="32" astro-icon="social/github"
 				><path
 					fill="currentColor"
