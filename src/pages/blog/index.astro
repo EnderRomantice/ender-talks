@@ -103,7 +103,10 @@ const head = {
 									{post.data.heroImage && (
 										<Image width={720} height={360} src={post.data.heroImage} alt="" />
 									)}
-									<h4 class="title">{post.data.title}</h4>
+
+									<h4 class="title">{post.data.title}<span class="lang">{post.data.language}</span></h4>
+									
+				
 									<p class="date">
 										<FormattedDate date={post.data.pubDate} />
 									</p>
@@ -116,4 +119,16 @@ const head = {
 		</main>
 		<Footer />
 	</body>
+	<style>
+	.title-content {
+	display: flex;
+	gap: 0.5rem;
+	}
+	
+	.lang {
+		font-size: 8px;
+		color: rgb(var(--gray));
+	}
+	
+	</style>
 </html>

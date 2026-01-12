@@ -1,7 +1,8 @@
 ---
-title: 'Deliberate Practice'
+title: '刻意练习'
 description: 'About my think'
 pubDate: 'Aug 29 2025'
+language: 'Chinese'
 ---
 
 我们生活中的一切行为实际上都是一种训练。

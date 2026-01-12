@@ -2,6 +2,7 @@
 title: 'Why have this Blog?'
 description: 'my fisrt post'
 pubDate: '1 11 2026'
+language: 'English'
 ---
 
 All right, because a little reason, I want create a new blog.  
