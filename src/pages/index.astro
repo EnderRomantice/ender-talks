@@ -1,12 +1,19 @@
 ---
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
+import BaseHead from "../components/BaseHead.astro";
 import { Image } from "astro:assets";
 import { index_img } from "../config/index_img";
 import "../styles/global.css";
+
+const head = {
+  title: "Ender Talks",
+  description: ""
+}
 ---
 
 <html>
+    <BaseHead title={head.title} description={""} />
     <Header />
 
     <div class="grid">
