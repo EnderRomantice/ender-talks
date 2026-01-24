@@ -5,6 +5,7 @@ import ICPC from "../assets/ICPC Coffee.jpg"
 import WuHouHouse from "../assets/Wu Hou House.jpg"
 import SchoolSky from "../assets/School Sky.jpg"
 import GuangHanSky from "../assets/Guang Han Sky.jpg"
+import TwoRingRoadEastSection from "../assets/2 Ring Road East Section.jpg"
 
 export const index_img = [
   {
@@ -53,6 +54,13 @@ export const index_img = [
     title: "Guang Han Sky",
     img: GuangHanSky,
     description: "Guang Han Sky",
+    location: "Guanghan China",
+    date: "Jun 13 2025"
+  },
+  {
+    title: "Two Ring Road East Section",
+    img: TwoRingRoadEastSection,
+    description: "Two Ring Road East Section",
     location: "Guanghan China",
     date: "Jun 13 2025"
   },
