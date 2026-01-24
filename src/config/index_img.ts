@@ -5,7 +5,7 @@ import ICPC from "../assets/ICPC Coffee.jpg"
 import WuHouHouse from "../assets/Wu Hou House.jpg"
 import SchoolSky from "../assets/School Sky.jpg"
 import GuangHanSky from "../assets/Guang Han Sky.jpg"
-import TwoRingRoadEastSection from "../assets/2 Ring Road East Section.jpg"
+import TwoRingRoadEastSection from "../assets/2 ring road east section.jpg"
 
 export const index_img = [
   {
