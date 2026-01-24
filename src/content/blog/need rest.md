@@ -1,7 +1,7 @@
 ---
 title: '工程师也是会倦怠的'
 description: 'About my think'
-pubDate: '24 1 2026'
+pubDate: '1 24 2026'
 language: 'Chinese'
 ---
 
@@ -39,5 +39,5 @@ language: 'Chinese'
 
 没错，这篇文章仅仅只是表达我目前的状态，没有什么解决方案和升华主题。
 
-Maybe I need rest?
+Maybe I need really rest?
 
