@@ -1,0 +1,183 @@
+---
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
+import BaseHead from "../../components/BaseHead.astro";
+import MusicPlayer from "../../components/MusicPlayer.astro";
+import { albums } from "../../data/albums";
+import "../../styles/global.css";
+
+const head = {
+  title: "Music - Ender Talks",
+  description: "Music Player"
+}
+---
+
+<html>
+    <BaseHead title={head.title} description={head.description} />
+    <Header />
+    
+    <main class="music-container">
+        
+        <h1 class="page-title">Music</h1>
+        <p class="subtitle">These are some of my favorite music tracks, and I'm sharing them with you now. I hope you can find some that you also like.</p>
+        <p class="subtitle">这是我喜欢的一些音乐，现在分享给你，希望你也能找到自己感兴趣的</p>
+        <section class="albums-section">
+            
+            
+            {albums.length === 0 ? (
+                <div class="empty-state">
+                    <p>No music found</p>
+                    <p class="hint">Add albums to src/assets/music/ directory</p>
+                </div>
+            ) : (
+                <div class="albums-grid">
+                    {albums.map((album) => (
+                        <a href={`/music/${album.id}`} class="album-card">
+                            <div class="album-cover">
+                                <img src={album.cover} alt={album.title} />
+                                <div class="play-overlay">
+                                    <svg viewBox="0 0 24 24" width="48" height="48">
+                                        <path fill="currentColor" d="M8 5v14l11-7z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                            <div class="album-info">
+                                <h3 class="album-title">{album.title}</h3>
+                                <p class="album-artist">{album.artist}</p>
+                            </div>
+                        </a>
+                    ))}
+                </div>
+            )}
+        </section>
+    </main>
+    
+    <Footer />
+    <MusicPlayer />
+</html>
+
+<style>
+    .music-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2em 1em;
+    }
+    
+    h1 {
+        text-align: center;
+        margin-bottom: 0.5em;
+    }
+    
+    .subtitle {
+        text-align: center;
+        color: rgb(var(--gray));
+        margin-bottom: 3em;
+    }
+    
+    .albums-section {
+        margin-top: 4em;
+    }
+    
+    .albums-section h2 {
+        margin-bottom: 1.5em;
+        font-size: 1.8em;
+    }
+    
+    .empty-state {
+        text-align: center;
+        padding: 3em;
+        color: rgb(var(--gray));
+    }
+    
+    .empty-state p:first-child {
+        font-size: 1.2em;
+        margin-bottom: 0.5em;
+    }
+    
+    .empty-state .hint {
+        font-size: 0.9em;
+        opacity: 0.7;
+    }
+    
+    .albums-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 2em;
+    }
+    
+    .album-card {
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(var(--gray), 15%);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        text-decoration: none;
+        color: inherit;
+    }
+    
+    .album-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(var(--gray), 25%);
+    }
+    
+    .album-cover {
+        position: relative;
+        aspect-ratio: 1;
+        overflow: hidden;
+    }
+    
+    .album-cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 0;
+    }
+    
+    .play-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+    
+    .play-overlay svg {
+        color: white;
+    }
+    
+    .album-card:hover .play-overlay {
+        opacity: 1;
+    }
+    
+    .album-info {
+        padding: 1em;
+    }
+    
+    .album-title {
+        font-size: 1.2em;
+        margin: 0 0 0.3em 0;
+        color: rgb(var(--black));
+    }
+    
+    .album-artist {
+        color: rgb(var(--gray));
+        margin: 0 0 0.5em 0;
+        font-size: 0.9em;
+    }
+    
+    .album-songs {
+        color: var(--accent);
+        margin: 0;
+        font-size: 0.85em;
+    }
+    
+    @media (max-width: 720px) {
+        .albums-grid {
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1em;
+        }
+    }
+</style>
