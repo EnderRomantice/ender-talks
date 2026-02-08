@@ -43,7 +43,7 @@ const head = {
                             </div>
                             <div class="album-info">
                                 <h3 class="album-title">{album.title}</h3>
-                                <p class="album-artist">{album.artist}</p>
+                                <p class="album-artist" title={album.description}>{album.description}</p>
                             </div>
                         </a>
                     ))}
@@ -161,6 +161,9 @@ const head = {
         color: rgb(var(--gray));
         margin: 0 0 0.5em 0;
         font-size: 0.9em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     
     .album-songs {
