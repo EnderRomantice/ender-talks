@@ -24,8 +24,8 @@ interface ReadmeData {
   recommended: string[];
 }
 
-// Use absolute path relative to project root
-const MUSIC_DIR = path.resolve(process.cwd(), 'src/assets/music');
+// Use public directory for music files (copied at build time)
+const MUSIC_DIR = path.resolve(process.cwd(), 'public/music');
 const AUDIO_EXTENSIONS = ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac', '.wma'];
 const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
 
@@ -154,7 +154,7 @@ function scanMusicDirectory(): Album[] {
           const ext = path.extname(file).toLowerCase();
           const baseName = path.basename(file, ext).toLowerCase();
           if (IMAGE_EXTENSIONS.includes(ext) && (baseName === 'face' || baseName === 'cover')) {
-            coverFile = `/src/assets/music/${entry.name}/${file}`;
+            coverFile = `/music/${entry.name}/${file}`;
             break;
           }
         }
@@ -164,7 +164,7 @@ function scanMusicDirectory(): Album[] {
           for (const file of albumFiles) {
             const ext = path.extname(file).toLowerCase();
             if (IMAGE_EXTENSIONS.includes(ext)) {
-              coverFile = `/src/assets/music/${entry.name}/${file}`;
+              coverFile = `/music/${entry.name}/${file}`;
               break;
             }
           }
@@ -188,7 +188,7 @@ function scanMusicDirectory(): Album[] {
             songs.push({
               title,
               duration,
-              file: `/src/assets/music/${entry.name}/${file}`,
+              file: `/music/${entry.name}/${file}`,
               isRecommended
             });
           }
