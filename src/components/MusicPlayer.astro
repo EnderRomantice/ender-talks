@@ -1,7 +1,7 @@
 ---
 ---
 
-<div id="floating-player" class="floating-player visible">
+<div id="floating-player" class="floating-player hidden">
     <button class="toggle-btn" id="player-toggle-btn" title="Minimize">
         <svg viewBox="0 0 24 24" width="16" height="16" class="toggle-icon">
             <path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
@@ -62,7 +62,7 @@
                     <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
                 </svg>
             </button>
-            <input type="range" id="volume-slider" min="0" max="100" value="30" />
+            <input type="range" id="volume-slider" min="0" max="100" value="40" />
         </div>
     </div>
 </div>
@@ -81,7 +81,7 @@
         currentTrackIndex: 0,
         currentPlaylist: [],
         isMuted: false,
-        isVisible: true,
+        isVisible: false,
         currentTime: 0,
         duration: 0,
         currentTrack: null,
