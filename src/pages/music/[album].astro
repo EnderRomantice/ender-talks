@@ -346,49 +346,121 @@ const head = {
     }
     
     @media (max-width: 720px) {
+        .album-detail-container {
+            padding: 1em 0.8em;
+        }
+
         .album-header {
             flex-direction: column;
             align-items: center;
             text-align: center;
-            gap: 1.5em;
+            gap: 1.2em;
+            margin-bottom: 2em;
         }
-        
+
         .album-cover-large {
-            width: 200px;
-            height: 200px;
+            width: 180px;
+            height: 180px;
+            border-radius: 8px;
         }
-        
+
         .album-meta h1 {
-            font-size: 2em;
+            font-size: 1.6em;
+            line-height: 1.2;
         }
-        
+
+        .album-description {
+            padding: 0.8em;
+            margin: 0.3em 0 0.8em 0;
+        }
+
+        .album-description p {
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+
         .album-actions {
             flex-direction: column;
             width: 100%;
+            gap: 0.8em;
         }
-        
+
         .play-all-btn {
             width: 100%;
             justify-content: center;
+            padding: 0.7em 1.2em;
+            font-size: 0.95em;
         }
-        
+
+        .back-link {
+            font-size: 0.9em;
+            justify-content: center;
+        }
+
+        .playlist-section {
+            margin-top: 1.5em;
+        }
+
+        .playlist-section h2 {
+            font-size: 1.3em;
+            margin-bottom: 0.8em;
+        }
+
+        .song-list {
+            border-radius: 8px;
+        }
+
         .song-list-header {
             display: none;
         }
-        
+
         .song-item {
-            grid-template-columns: 50px 1fr;
-            padding: 1em;
+            grid-template-columns: 45px 1fr;
+            padding: 0.9em 1em;
+            min-height: 56px;
         }
-        
+
+        .song-title {
+            font-size: 0.95em;
+            padding-right: 0.5em;
+        }
+
         .play-song-btn {
             display: flex;
-            width: 28px;
-            height: 28px;
+            width: 32px;
+            height: 32px;
         }
-        
+
         .number {
             display: none;
+        }
+
+        .recommended-star svg {
+            width: 14px;
+            height: 14px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .album-detail-container {
+            padding: 0.8em 0.6em;
+        }
+
+        .album-cover-large {
+            width: 150px;
+            height: 150px;
+        }
+
+        .album-meta h1 {
+            font-size: 1.4em;
+        }
+
+        .song-item {
+            padding: 0.8em 0.9em;
+        }
+
+        .song-title {
+            font-size: 0.9em;
         }
     }
 </style>

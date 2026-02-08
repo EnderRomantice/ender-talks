@@ -57,10 +57,17 @@ const head = {
 </html>
 
 <style>
+    html, body {
+        overflow-x: hidden;
+        max-width: 100%;
+    }
+
     .music-container {
         max-width: 1200px;
+        width: 100%;
         margin: 0 auto;
         padding: 2em 1em;
+        box-sizing: border-box;
     }
     
     h1 {
@@ -103,6 +110,8 @@ const head = {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
         gap: 2em;
+        width: 100%;
+        box-sizing: border-box;
     }
     
     .album-card {
@@ -173,9 +182,78 @@ const head = {
     }
     
     @media (max-width: 720px) {
+        .music-container {
+            padding: 1em 0.8em;
+            width: 100%;
+            max-width: 100vw;
+        }
+
+        h1 {
+            font-size: 2em;
+            margin-bottom: 0.3em;
+        }
+
+        .subtitle {
+            font-size: 0.85em;
+            margin-bottom: 1.5em;
+            padding: 0 0.5em;
+        }
+
+        .albums-section {
+            margin-top: 2em;
+        }
+
         .albums-grid {
-            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            gap: 1em;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.8em;
+            max-width: 100%;
+        }
+
+        .album-card {
+            border-radius: 8px;
+            min-width: 0;
+        }
+
+        .album-info {
+            padding: 0.7em;
+        }
+
+        .album-title {
+            font-size: 0.95em;
+            margin-bottom: 0.2em;
+        }
+
+        .album-artist {
+            font-size: 0.8em;
+        }
+
+        .play-overlay svg {
+            width: 36px;
+            height: 36px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .music-container {
+            padding: 0.8em 0.6em;
+        }
+
+        .albums-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.6em;
+            max-width: 100%;
+        }
+
+        .album-info {
+            padding: 0.5em;
+        }
+
+        .album-title {
+            font-size: 0.85em;
+        }
+
+        .album-artist {
+            font-size: 0.75em;
         }
     }
 </style>
