@@ -82,29 +82,35 @@
     
     // 如果已经初始化过，跳过重复初始化（View Transitions 保持组件时）
     if (window[PLAYER_INITIALIZED]) {
-        // 只需重新绑定全局函数供新页面使用
-        const existingState = window.musicPlayerState;
-        if (existingState) {
-            window.playAlbum = existingState.playAlbum;
-            window.playTrack = existingState.playTrack;
-        }
+        // 只需重新暴露全局函数供新页面使用（这些函数会操作 window.__PLAYER_STATE__）
+        window.playAlbum = playAlbum;
+        window.playTrack = playTrack;
+        window.playTrackFromBox = playTrackFromBox;
     }
     
     window[PLAYER_INITIALIZED] = true;
     
     const STORAGE_KEY = 'musicPlayerState';
     
-    let state = {
-        isPlaying: false,
-        currentTrackIndex: 0,
-        currentPlaylist: [],
-        isMuted: false,
-        isVisible: false,
-        currentTime: 0,
-        duration: 0,
-        currentTrack: null,
-        volume: 10
-    };
+    // 将状态挂载到 window，所有函数共享同一个状态对象
+    if (!window.__PLAYER_STATE__) {
+        window.__PLAYER_STATE__ = {
+            isPlaying: false,
+            currentTrackIndex: 0,
+            currentPlaylist: [],
+            isMuted: false,
+            isVisible: false,
+            currentTime: 0,
+            duration: 0,
+            currentTrack: null,
+            volume: 10
+        };
+    }
+    
+    // 辅助函数：获取当前状态（总是从 window 读取）
+    function getState() {
+        return window.__PLAYER_STATE__;
+    }
     
     let progressInterval;
     let isRestoring = false;
@@ -136,16 +142,17 @@
     // Save state to localStorage
     function saveState() {
         try {
+            const s = getState();
             localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                isPlaying: state.isPlaying,
-                currentTrackIndex: state.currentTrackIndex,
-                currentPlaylist: state.currentPlaylist,
-                isMuted: state.isMuted,
-                isVisible: state.isVisible,
-                currentTime: audioElement ? audioElement.currentTime : state.currentTime,
-                duration: audioElement ? audioElement.duration : state.duration,
-                currentTrack: state.currentTrack,
-                volume: state.volume,
+                isPlaying: s.isPlaying,
+                currentTrackIndex: s.currentTrackIndex,
+                currentPlaylist: s.currentPlaylist,
+                isMuted: s.isMuted,
+                isVisible: s.isVisible,
+                currentTime: audioElement ? audioElement.currentTime : s.currentTime,
+                duration: audioElement ? audioElement.duration : s.duration,
+                currentTrack: s.currentTrack,
+                volume: s.volume,
                 savedAt: Date.now()
             }));
         } catch (e) {
@@ -161,7 +168,7 @@
                 const parsed = JSON.parse(saved);
                 // Only restore if saved within last 30 minutes
                 if (Date.now() - (parsed.savedAt || 0) < 30 * 60 * 1000) {
-                    state = { ...state, ...parsed };
+                    Object.assign(getState(), parsed);
                     return true;
                 }
             }
@@ -173,7 +180,8 @@
     
     // Restore player state
     function restoreState() {
-        if (!state.currentTrack || !state.currentPlaylist.length || !audioElement) return;
+        const s = getState();
+        if (!s.currentTrack || !s.currentPlaylist.length || !audioElement) return;
         
         isRestoring = true;
         
@@ -181,44 +189,36 @@
         updatePlayerVisibility();
         
         // Restore volume
-        if (state.volume !== undefined) {
-            volumeSlider.value = state.volume;
+        if (s.volume !== undefined) {
+            volumeSlider.value = s.volume;
         }
         
         // Restore track info
-        updateTrackInfo(state.currentTrack);
+        updateTrackInfo(s.currentTrack);
         
         // Use existing DOM audio element (persisted by View Transitions)
-        if (state.currentTrack.file) {
-            // 移除旧的事件监听器（如果有）
-            audioElement.removeEventListener('ended', onTrackEnded);
-            audioElement.removeEventListener('loadedmetadata', onLoadedMetadata);
+        if (s.currentTrack.file) {
+            ensureAudioListeners();
             
-            // 设置新的音频源
-            audioElement.src = state.currentTrack.file;
-            audioElement.volume = (state.volume || 70) / 100;
-            audioElement.muted = state.isMuted;
-            
-            // 添加事件监听器
-            audioElement.addEventListener('ended', onTrackEnded);
-            audioElement.addEventListener('loadedmetadata', onLoadedMetadata);
+            audioElement.src = s.currentTrack.file;
+            audioElement.volume = (s.volume || 70) / 100;
+            audioElement.muted = s.isMuted;
             
             // Update button state
             updatePlayButton();
             updateVolumeIcon();
             
-            // 如果有保存的播放位置，恢复它
-            if (state.currentTime > 0) {
-                audioElement.currentTime = state.currentTime;
+            if (s.currentTime > 0) {
+                audioElement.currentTime = s.currentTime;
             }
             
             // If was playing, start playing
-            if (state.isPlaying) {
+            if (s.isPlaying) {
                 audioElement.play().then(() => {
                     startProgress();
                 }).catch(err => {
                     console.log('Auto-play prevented:', err);
-                    state.isPlaying = false;
+                    s.isPlaying = false;
                     updatePlayButton();
                 });
             }
@@ -227,17 +227,24 @@
         isRestoring = false;
     }
     
-    // 元数据加载完成回调
     function onLoadedMetadata() {
-        if (audioElement) {
-            state.duration = audioElement.duration;
+        if (audioElement && !isRestoring) {
+            getState().duration = audioElement.duration;
             updateProgressBar();
             saveState();
         }
     }
     
+    function ensureAudioListeners() {
+        if (!audioElement || audioElement.__listenersBound) return;
+        
+        audioElement.addEventListener('ended', onTrackEnded);
+        audioElement.addEventListener('loadedmetadata', onLoadedMetadata);
+        audioElement.__listenersBound = true;
+    }
+    
     function updatePlayerVisibility() {
-        if (state.isVisible) {
+        if (getState().isVisible) {
             floatingPlayer.classList.remove('hidden');
             floatingPlayer.classList.add('visible');
             playerShowBtn.classList.add('hidden');
@@ -253,22 +260,23 @@
     }
     
     function toggleVisibility() {
-        state.isVisible = !state.isVisible;
+        getState().isVisible = !getState().isVisible;
         updatePlayerVisibility();
     }
     
     function togglePlay() {
-        if (!state.currentPlaylist.length) return;
+        const s = getState();
+        if (!s.currentPlaylist.length) return;
         
-        state.isPlaying = !state.isPlaying;
+        s.isPlaying = !s.isPlaying;
         updatePlayButton();
         
-        if (state.isPlaying) {
+        if (s.isPlaying) {
             startProgress();
             if (audioElement) {
                 audioElement.play().catch(err => {
                     console.log('Play failed:', err);
-                    state.isPlaying = false;
+                    s.isPlaying = false;
                     updatePlayButton();
                 });
             }
@@ -283,7 +291,7 @@
     }
     
     function updatePlayButton() {
-        if (state.isPlaying) {
+        if (getState().isPlaying) {
             playIcon.style.display = 'none';
             pauseIcon.style.display = 'block';
         } else {
@@ -293,7 +301,7 @@
     }
     
     function updateVolumeIcon() {
-        if (state.isMuted || volumeSlider.value == 0) {
+        if (getState().isMuted || volumeSlider.value == 0) {
             volumeIcon.innerHTML = '<path fill="currentColor" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
         } else if (volumeSlider.value < 50) {
             volumeIcon.innerHTML = '<path fill="currentColor" d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>';
@@ -303,19 +311,22 @@
     }
     
     function toggleMute() {
-        state.isMuted = !state.isMuted;
+        const s = getState();
+        s.isMuted = !s.isMuted;
         if (audioElement) {
-            audioElement.muted = state.isMuted;
+            audioElement.muted = s.isMuted;
         }
         updateVolumeIcon();
         saveState();
     }
     
     function startProgress() {
-        if (progressInterval) clearInterval(progressInterval);
+      
+        stopProgress();
+        
         progressInterval = setInterval(() => {
             if (audioElement) {
-                state.currentTime = audioElement.currentTime;
+                getState().currentTime = audioElement.currentTime;
                 updateProgressBar();
             }
         }, 100);
@@ -326,8 +337,9 @@
     }
     
     function updateProgressBar() {
-        const duration = audioElement?.duration || state.duration || 0;
-        const current = audioElement?.currentTime || state.currentTime || 0;
+        const s = getState();
+        const duration = audioElement?.duration || s.duration || 0;
+        const current = audioElement?.currentTime || s.currentTime || 0;
         const progress = duration > 0 ? (current / duration) * 100 : 0;
         
         progressFill.style.width = `${progress}%`;
@@ -343,16 +355,18 @@
     }
     
     function previousTrack() {
-        if (state.currentPlaylist.length > 0) {
-            state.currentTrackIndex = (state.currentTrackIndex - 1 + state.currentPlaylist.length) % state.currentPlaylist.length;
-            loadTrack(state.currentPlaylist[state.currentTrackIndex]);
+        const s = getState();
+        if (s.currentPlaylist.length > 0) {
+            s.currentTrackIndex = (s.currentTrackIndex - 1 + s.currentPlaylist.length) % s.currentPlaylist.length;
+            loadTrack(s.currentPlaylist[s.currentTrackIndex]);
         }
     }
     
     function nextTrack() {
-        if (state.currentPlaylist.length > 0) {
-            state.currentTrackIndex = (state.currentTrackIndex + 1) % state.currentPlaylist.length;
-            loadTrack(state.currentPlaylist[state.currentTrackIndex]);
+        const s = getState();
+        if (s.currentPlaylist.length > 0) {
+            s.currentTrackIndex = (s.currentTrackIndex + 1) % s.currentPlaylist.length;
+            loadTrack(s.currentPlaylist[s.currentTrackIndex]);
         }
     }
     
@@ -375,31 +389,31 @@
     function loadTrack(track) {
         if (!track || !audioElement) return;
         
-        state.currentTrack = track;
+        const s = getState();
+        s.currentTrack = track;
         updateTrackInfo(track);
         
         // 使用现有的 DOM audio 元素（由 transition:persist 保持）
         // 暂停当前播放
         audioElement.pause();
-        audioElement.removeEventListener('ended', onTrackEnded);
-        audioElement.removeEventListener('loadedmetadata', onLoadedMetadata);
+        
+        // 确保事件监听器只绑定一次
+        ensureAudioListeners();
         
         if (track.file) {
             audioElement.src = track.file;
-            audioElement.volume = (state.volume || 70) / 100;
-            audioElement.muted = state.isMuted;
-            audioElement.addEventListener('ended', onTrackEnded);
-            audioElement.addEventListener('loadedmetadata', onLoadedMetadata);
+            audioElement.volume = (s.volume || 70) / 100;
+            audioElement.muted = s.isMuted;
             
-            if (state.isPlaying) {
+            if (s.isPlaying) {
                 audioElement.play().catch(err => {
                     console.log('Auto-play prevented:', err);
-                    state.isPlaying = false;
+                    s.isPlaying = false;
                     updatePlayButton();
                 });
                 startProgress();
             } else {
-                state.currentTime = 0;
+                s.currentTime = 0;
                 updateProgressBar();
             }
         }
@@ -407,8 +421,8 @@
         saveState();
         
         // Show player when track loaded
-        if (!state.isVisible) {
-            state.isVisible = true;
+        if (!s.isVisible) {
+            s.isVisible = true;
             updatePlayerVisibility();
         }
     }
@@ -419,32 +433,42 @@
     
     // Global function to play album
     function playAlbum(album, startIndex = 0) {
-        state.currentPlaylist = album.songs.map((song, index) => ({
+        console.log('[MusicPlayer] playAlbum called:', album?.title, 'startIndex:', startIndex);
+        const s = getState();
+        
+        if (!album || !album.songs || !album.songs.length) {
+            console.error('[MusicPlayer] Invalid album data:', album);
+            return;
+        }
+        
+        s.currentPlaylist = album.songs.map((song, index) => ({
             ...song,
             album: album.title,
             artist: album.artist,
             cover: album.cover
         }));
-        state.currentTrackIndex = startIndex;
-        state.isPlaying = true;
-        loadTrack(state.currentPlaylist[state.currentTrackIndex]);
+        s.currentTrackIndex = startIndex;
+        s.isPlaying = true;
+        console.log('[MusicPlayer] Playlist updated, loading track:', s.currentPlaylist[startIndex]?.title);
+        loadTrack(s.currentPlaylist[s.currentTrackIndex]);
         updatePlayButton();
         saveState();
     }
     
     // Global function to play single track
     function playTrack(track) {
-        state.currentPlaylist = [track];
-        state.currentTrackIndex = 0;
-        state.isPlaying = true;
+        const s = getState();
+        s.currentPlaylist = [track];
+        s.currentTrackIndex = 0;
+        s.isPlaying = true;
         loadTrack(track);
         updatePlayButton();
         saveState();
     }
     
     // Global function for MusicBox component - play single song from album
-    window.playTrackFromBox = function(albumId, songTitle) {
-        // 使用从 MusicBox 注入的全局 albums 数据
+    function playTrackFromBox(albumId, songTitle) {
+       
         const albums = window.__MUSIC_ALBUMS__;
         
         if (!albums) {
@@ -464,7 +488,7 @@
             return;
         }
 
-        // 创建完整的 track 对象
+        
         const track = {
             ...song,
             album: album.title,
@@ -472,11 +496,11 @@
             cover: album.cover
         };
 
-        // 播放单曲
+        
         playTrack(track);
-    };
+    }
 
-    // 处理 MusicBox 队列中的点击请求
+   
     function processMusicBoxQueue() {
         if (window.musicBoxClickQueue && window.musicBoxClickQueue.length > 0) {
             console.log('MusicPlayer: 处理队列中的', window.musicBoxClickQueue.length, '个请求');
@@ -502,7 +526,7 @@
         
         volumeSlider?.addEventListener('input', (e) => {
             const newVolume = parseInt(e.target.value);
-            state.volume = newVolume;
+            getState().volume = newVolume;
             if (audioElement) {
                 audioElement.volume = newVolume / 100;
             }
@@ -516,7 +540,7 @@
             const rect = e.currentTarget.getBoundingClientRect();
             const clickPosition = (e.clientX - rect.left) / rect.width;
             audioElement.currentTime = clickPosition * audioElement.duration;
-            state.currentTime = audioElement.currentTime;
+            getState().currentTime = audioElement.currentTime;
             updateProgressBar();
             saveState();
         });
@@ -530,29 +554,27 @@
         saveState();
     });
     
-    // After View Transitions swap - ensure global functions are available
+    // After View Transitions swap - expose global functions (they will use window.__PLAYER_STATE__)
     document.addEventListener('astro:after-swap', () => {
-        // 重新绑定全局函数供新页面使用
-        window.playAlbum = window.musicPlayerState?.playAlbum || playAlbum;
-        window.playTrack = window.musicPlayerState?.playTrack || playTrack;
-        window.playTrackFromBox = window.musicPlayerState?.playTrackFromBox || window.playTrackFromBox;
+        console.log('[MusicPlayer] astro:after-swap - re-exposing global functions');
+        window.playAlbum = playAlbum;
+        window.playTrack = playTrack;
+        window.playTrackFromBox = playTrackFromBox;
+        console.log('[MusicPlayer] Global functions exposed, playAlbum:', typeof window.playAlbum);
     });
-    
+
     // Initialize
     if (!isInitialized) {
         loadState();
         restoreState();
         updateVolumeIcon();
         isInitialized = true;
-        
-        // 保存全局函数引用到 window，供 View Transitions 后恢复
-        window.musicPlayerState = {
-            playAlbum: playAlbum,
-            playTrack: playTrack,
-            playTrackFromBox: window.playTrackFromBox
-        };
-        
-        // 处理队列中的 MusicBox 点击请求
+
+        // 暴露全局函数供外部调用
+        window.playAlbum = playAlbum;
+        window.playTrack = playTrack;
+        window.playTrackFromBox = playTrackFromBox;
+
         processMusicBoxQueue();
     }
 </script>

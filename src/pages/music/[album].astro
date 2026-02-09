@@ -51,7 +51,7 @@ const head = {
         <section class="playlist-section">
             <h2>Playlist</h2>
 
-            <div class="song-list">
+            <div class="song-list" data-album={JSON.stringify(album)}>
                 <div class="song-list-header">
                     <span class="song-number"> </span>
                     <span class="song-title-header">Title</span>
@@ -109,35 +109,79 @@ const head = {
         </section>
     </main>
 
-    <script define:vars={{ album: JSON.stringify(album) }}>
-        const albumData = JSON.parse(album);
+    <script>
+        // 从 DOM 获取当前页面的 album 数据
+        function getAlbumFromDOM() {
+            const songList = document.querySelector('.song-list');
+            if (!songList) return null;
+            
+            try {
+                const albumData = songList.dataset.album;
+                if (!albumData) return null;
+                return JSON.parse(albumData);
+            } catch (e) {
+                console.error('[Album Page] Failed to parse album data:', e);
+                return null;
+            }
+        }
 
-        document
-            .getElementById("play-all-btn")
-            ?.addEventListener("click", () => {
-                if (window.playAlbum) {
-                    window.playAlbum(albumData, 0);
+        function handlePlayAll() {
+            const album = getAlbumFromDOM();
+            console.log('[Album Page] Play All clicked, album:', album?.title);
+            if (window.playAlbum && album) {
+                window.playAlbum(album, 0);
+            } else {
+                console.error('[Album Page] window.playAlbum not found or no album data!');
+            }
+        }
+
+        function playSongAtIndex(index) {
+            const album = getAlbumFromDOM();
+            console.log('[Album Page] Play song at index:', index, 'song:', album?.songs?.[index]?.title);
+            if (window.playAlbum && album) {
+                window.playAlbum(album, index);
+            } else {
+                console.error('[Album Page] window.playAlbum not found or no album data!');
+            }
+        }
+
+        // 使用事件委托到 document，只绑定一次
+        if (!window.__ALBUM_PAGE_EVENTS_BOUND__) {
+            window.__ALBUM_PAGE_EVENTS_BOUND__ = true;
+            
+            document.addEventListener('click', (e) => {
+                // Play All 按钮
+                const playAllBtn = e.target.closest('#play-all-btn');
+                if (playAllBtn) {
+                    e.preventDefault();
+                    handlePlayAll();
+                    return;
+                }
+                
+                // 播放按钮
+                const playBtn = e.target.closest('.play-song-btn');
+                if (playBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const index = parseInt(playBtn.dataset.index);
+                    playSongAtIndex(index);
+                    return;
+                }
+                
+                // 歌曲项（排除播放按钮）
+                const songItem = e.target.closest('.song-item');
+                if (songItem && !e.target.closest('.play-song-btn')) {
+                    e.preventDefault();
+                    const index = parseInt(songItem.dataset.index);
+                    playSongAtIndex(index);
+                    return;
                 }
             });
-
-        document.querySelectorAll(".play-song-btn").forEach((btn) => {
-            btn.addEventListener("click", (e) => {
-                e.stopPropagation();
-                const index = parseInt(btn.dataset.index);
-                if (window.playAlbum) {
-                    window.playAlbum(albumData, index);
-                }
-            });
-        });
-
-        document.querySelectorAll(".song-item").forEach((item) => {
-            item.addEventListener("click", () => {
-                const index = parseInt(item.dataset.index);
-                if (window.playAlbum) {
-                    window.playAlbum(albumData, index);
-                }
-            });
-        });
+            
+            console.log('[Album Page] Event delegation bound to document');
+        }
+        
+        console.log('[Album Page] Script initialized, album:', getAlbumFromDOM()?.title);
     </script>
 </BaseLayout>
 

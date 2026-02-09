@@ -47,8 +47,10 @@ const albumsDataJson = JSON.stringify(albums);
   // 解析注入的 albums 数据
   const albums = JSON.parse(albumsData);
   
-  // 将 albums 数据挂载到全局，供 MusicPlayer 使用
-  window.__MUSIC_ALBUMS__ = albums;
+  // 将 albums 数据挂载到全局（仅首次），供 MusicPlayer 使用
+  if (!window.__MUSIC_ALBUMS__) {
+    window.__MUSIC_ALBUMS__ = albums;
+  }
   
   // 音乐盒子点击处理队列
   window.musicBoxClickQueue = window.musicBoxClickQueue || [];
