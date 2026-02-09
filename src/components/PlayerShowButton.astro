@@ -85,24 +85,39 @@
         updateUI();
     }
     
-    // Subscribe to state changes
-    controller.on('visibilityChange', updateUI);
-    controller.on('trackChange', updateUI);
-    controller.on('playStateChange', updateUI);
+    // Track if already subscribed
+    let isSubscribed = false;
+    
+    // Subscribe to state changes (only once)
+    function subscribe() {
+        if (isSubscribed) return;
+        controller.on('visibilityChange', updateUI);
+        controller.on('trackChange', updateUI);
+        controller.on('playStateChange', updateUI);
+        isSubscribed = true;
+    }
+    
+    function unsubscribe() {
+        if (!isSubscribed) return;
+        controller.off('visibilityChange', updateUI);
+        controller.off('trackChange', updateUI);
+        controller.off('playStateChange', updateUI);
+        isSubscribed = false;
+    }
     
     // Initialize on first load
+    subscribe();
     init();
     
     // Re-initialize after view transitions
     document.addEventListener('astro:after-swap', () => {
+        // Don't re-subscribe, just update UI
         init();
     });
     
     // Cleanup on page unload
     window.addEventListener('beforeunload', () => {
-        controller.off('visibilityChange', updateUI);
-        controller.off('trackChange', updateUI);
-        controller.off('playStateChange', updateUI);
+        unsubscribe();
     });
 </script>
 

@@ -242,14 +242,30 @@ import PlayerShowButton from './PlayerShowButton.astro';
         }
     }
     
-    // Subscribe to controller events
+    // Track subscription state
+    let isSubscribed = false;
+    
+    // Subscribe to controller events (only once)
     function subscribe() {
+        if (isSubscribed) return;
         controller.on('visibilityChange', updateVisibility);
         controller.on('trackChange', updateTrackInfo);
         controller.on('playStateChange', updatePlayButton);
         controller.on('progress', updateProgress);
         controller.on('volumeChange', updateVolumeIcon);
         controller.on('muteChange', updateVolumeIcon);
+        isSubscribed = true;
+    }
+    
+    function unsubscribe() {
+        if (!isSubscribed) return;
+        controller.off('visibilityChange', updateVisibility);
+        controller.off('trackChange', updateTrackInfo);
+        controller.off('playStateChange', updatePlayButton);
+        controller.off('progress', updateProgress);
+        controller.off('volumeChange', updateVolumeIcon);
+        controller.off('muteChange', updateVolumeIcon);
+        isSubscribed = false;
     }
     
     // Restore state
@@ -265,11 +281,24 @@ import PlayerShowButton from './PlayerShowButton.astro';
         updatePlayButton(state.isPlaying);
         updateVolumeIcon();
         
-        // Setup audio element
+        // Restore progress bar immediately
+        if (state.currentTrack && state.duration > 0) {
+            updateProgress({
+                currentTime: state.currentTime,
+                duration: state.duration,
+                percentage: (state.currentTime / state.duration) * 100
+            });
+        }
+        
+        // Setup audio element - but don't reload if already playing
         if (elements.audio) {
             controller.setAudioElement(elements.audio);
             
-            if (state.currentTrack?.file) {
+            // Only set src if it's different (avoid reloading)
+            const needsReload = !elements.audio.src || 
+                               elements.audio.src !== new URL(state.currentTrack?.file || '', window.location.href).href;
+            
+            if (state.currentTrack?.file && needsReload) {
                 elements.audio.src = state.currentTrack.file;
                 elements.audio.volume = (state.volume || 70) / 100;
                 elements.audio.muted = state.isMuted;
@@ -281,6 +310,10 @@ import PlayerShowButton from './PlayerShowButton.astro';
                 if (state.isPlaying) {
                     elements.audio.play().catch(console.error);
                 }
+            } else if (state.currentTrack?.file) {
+                // Just update properties without reloading
+                elements.audio.volume = (state.volume || 70) / 100;
+                elements.audio.muted = state.isMuted;
             }
         }
     }
