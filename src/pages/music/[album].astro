@@ -1,10 +1,6 @@
 ---
-import Header from "../../components/Header.astro";
-import Footer from "../../components/Footer.astro";
-import BaseHead from "../../components/BaseHead.astro";
-import MusicPlayer from "../../components/MusicPlayer.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
 import { albums } from "../../data/albums";
-import "../../styles/global.css";
 
 export function getStaticPaths() {
     return albums.map((album) => ({
@@ -21,10 +17,7 @@ const head = {
 };
 ---
 
-<html>
-    <BaseHead title={head.title} description={head.description} />
-    <Header />
-
+<BaseLayout title={head.title} description={head.description}>
     <main class="album-detail-container">
         <div class="album-header">
             <div class="album-cover-large">
@@ -116,8 +109,6 @@ const head = {
         </section>
     </main>
 
-    <Footer />
-
     <script define:vars={{ album: JSON.stringify(album) }}>
         const albumData = JSON.parse(album);
 
@@ -148,8 +139,7 @@ const head = {
             });
         });
     </script>
-    <MusicPlayer />
-</html>
+</BaseLayout>
 
 <style>
     .album-detail-container {

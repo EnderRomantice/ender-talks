@@ -3,6 +3,7 @@ import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
 import BaseHead from "../components/BaseHead.astro";
 import MusicPlayer from "../components/MusicPlayer.astro";
+import { ViewTransitions } from "astro:transitions";
 import "../styles/global.css";
 
 interface Props {
@@ -15,6 +16,7 @@ const { title, description } = Astro.props;
 
 <html>
 	<BaseHead title={title} description={description} />
+	<ViewTransitions fallback="swap" />
 	<Header />
 	
 	<slot />

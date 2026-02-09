@@ -1,7 +1,7 @@
 ---
 ---
 
-<div id="floating-player" class="floating-player hidden">
+<div id="floating-player" class="floating-player hidden" transition:persist="music-player">
     <button class="toggle-btn" id="player-toggle-btn" title="Minimize">
         <svg viewBox="0 0 24 24" width="16" height="16" class="toggle-icon">
             <path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
@@ -73,7 +73,25 @@
     </svg>
 </button>
 
+<!-- 使用真实的 audio DOM 元素，这样 transition:persist 可以保持播放状态 -->
+<audio id="persistent-audio" transition:persist="audio-player"></audio>
+
 <script>
+    // 使用 Symbol 创建全局唯一标识符，确保脚本只初始化一次
+    const PLAYER_INITIALIZED = Symbol.for('musicPlayerInitialized');
+    
+    // 如果已经初始化过，跳过重复初始化（View Transitions 保持组件时）
+    if (window[PLAYER_INITIALIZED]) {
+        // 只需重新绑定全局函数供新页面使用
+        const existingState = window.musicPlayerState;
+        if (existingState) {
+            window.playAlbum = existingState.playAlbum;
+            window.playTrack = existingState.playTrack;
+        }
+    }
+    
+    window[PLAYER_INITIALIZED] = true;
+    
     const STORAGE_KEY = 'musicPlayerState';
     
     let state = {
@@ -89,8 +107,11 @@
     };
     
     let progressInterval;
-    let audioElement = null;
     let isRestoring = false;
+    let isInitialized = false;
+    
+    // 获取持久化的 DOM audio 元素（transition:persist 会保持这个元素）
+    const audioElement = document.getElementById('persistent-audio');
     
     const floatingPlayer = document.getElementById('floating-player');
     const playerShowBtn = document.getElementById('player-show-btn');
@@ -152,7 +173,7 @@
     
     // Restore player state
     function restoreState() {
-        if (!state.currentTrack || !state.currentPlaylist.length) return;
+        if (!state.currentTrack || !state.currentPlaylist.length || !audioElement) return;
         
         isRestoring = true;
         
@@ -167,23 +188,29 @@
         // Restore track info
         updateTrackInfo(state.currentTrack);
         
-        // Create audio element
+        // Use existing DOM audio element (persisted by View Transitions)
         if (state.currentTrack.file) {
-            audioElement = new Audio(state.currentTrack.file);
+            // 移除旧的事件监听器（如果有）
+            audioElement.removeEventListener('ended', onTrackEnded);
+            audioElement.removeEventListener('loadedmetadata', onLoadedMetadata);
+            
+            // 设置新的音频源
+            audioElement.src = state.currentTrack.file;
             audioElement.volume = (state.volume || 70) / 100;
             audioElement.muted = state.isMuted;
-            audioElement.currentTime = state.currentTime || 0;
             
-            audioElement.addEventListener('loadedmetadata', () => {
-                state.duration = audioElement.duration;
-                updateProgressBar();
-            });
-            
+            // 添加事件监听器
             audioElement.addEventListener('ended', onTrackEnded);
+            audioElement.addEventListener('loadedmetadata', onLoadedMetadata);
             
             // Update button state
             updatePlayButton();
             updateVolumeIcon();
+            
+            // 如果有保存的播放位置，恢复它
+            if (state.currentTime > 0) {
+                audioElement.currentTime = state.currentTime;
+            }
             
             // If was playing, start playing
             if (state.isPlaying) {
@@ -198,6 +225,15 @@
         }
         
         isRestoring = false;
+    }
+    
+    // 元数据加载完成回调
+    function onLoadedMetadata() {
+        if (audioElement) {
+            state.duration = audioElement.duration;
+            updateProgressBar();
+            saveState();
+        }
     }
     
     function updatePlayerVisibility() {
@@ -337,27 +373,23 @@
     }
     
     function loadTrack(track) {
-        if (!track) return;
+        if (!track || !audioElement) return;
         
         state.currentTrack = track;
         updateTrackInfo(track);
         
-        // Create new audio element
-        if (audioElement) {
-            audioElement.pause();
-            audioElement.removeEventListener('ended', onTrackEnded);
-        }
+        // 使用现有的 DOM audio 元素（由 transition:persist 保持）
+        // 暂停当前播放
+        audioElement.pause();
+        audioElement.removeEventListener('ended', onTrackEnded);
+        audioElement.removeEventListener('loadedmetadata', onLoadedMetadata);
         
         if (track.file) {
-            audioElement = new Audio(track.file);
+            audioElement.src = track.file;
             audioElement.volume = (state.volume || 70) / 100;
             audioElement.muted = state.isMuted;
             audioElement.addEventListener('ended', onTrackEnded);
-            audioElement.addEventListener('loadedmetadata', () => {
-                state.duration = audioElement.duration;
-                updateProgressBar();
-                saveState();
-            });
+            audioElement.addEventListener('loadedmetadata', onLoadedMetadata);
             
             if (state.isPlaying) {
                 audioElement.play().catch(err => {
@@ -386,7 +418,7 @@
     }
     
     // Global function to play album
-    window.playAlbum = function(album, startIndex = 0) {
+    function playAlbum(album, startIndex = 0) {
         state.currentPlaylist = album.songs.map((song, index) => ({
             ...song,
             album: album.title,
@@ -398,54 +430,81 @@
         loadTrack(state.currentPlaylist[state.currentTrackIndex]);
         updatePlayButton();
         saveState();
-    };
+    }
     
     // Global function to play single track
-    window.playTrack = function(track) {
+    function playTrack(track) {
         state.currentPlaylist = [track];
         state.currentTrackIndex = 0;
         state.isPlaying = true;
         loadTrack(track);
         updatePlayButton();
         saveState();
-    };
+    }
     
-    // Event listeners
-    toggleBtn?.addEventListener('click', toggleVisibility);
-    playerShowBtn?.addEventListener('click', toggleVisibility);
-    playBtn?.addEventListener('click', togglePlay);
-    prevBtn?.addEventListener('click', () => { previousTrack(); saveState(); });
-    nextBtn?.addEventListener('click', () => { nextTrack(); saveState(); });
-    muteBtn?.addEventListener('click', toggleMute);
+    // Expose to window for external access
+    window.playAlbum = playAlbum;
+    window.playTrack = playTrack;
     
-    volumeSlider?.addEventListener('input', (e) => {
-        const newVolume = parseInt(e.target.value);
-        state.volume = newVolume;
-        if (audioElement) {
-            audioElement.volume = newVolume / 100;
-        }
-        updateVolumeIcon();
-        saveState();
-    });
-    
-    // Click on progress bar to seek
-    document.querySelector('.progress-bar')?.addEventListener('click', (e) => {
-        if (!audioElement) return;
-        const rect = e.currentTarget.getBoundingClientRect();
-        const clickPosition = (e.clientX - rect.left) / rect.width;
-        audioElement.currentTime = clickPosition * audioElement.duration;
-        state.currentTime = audioElement.currentTime;
-        updateProgressBar();
-        saveState();
-    });
+    // Event listeners - only bind once
+    if (!isInitialized) {
+        toggleBtn?.addEventListener('click', toggleVisibility);
+        playerShowBtn?.addEventListener('click', toggleVisibility);
+        playBtn?.addEventListener('click', togglePlay);
+        prevBtn?.addEventListener('click', () => { previousTrack(); saveState(); });
+        nextBtn?.addEventListener('click', () => { nextTrack(); saveState(); });
+        muteBtn?.addEventListener('click', toggleMute);
+        
+        volumeSlider?.addEventListener('input', (e) => {
+            const newVolume = parseInt(e.target.value);
+            state.volume = newVolume;
+            if (audioElement) {
+                audioElement.volume = newVolume / 100;
+            }
+            updateVolumeIcon();
+            saveState();
+        });
+        
+        // Click on progress bar to seek
+        document.querySelector('.progress-bar')?.addEventListener('click', (e) => {
+            if (!audioElement) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clickPosition = (e.clientX - rect.left) / rect.width;
+            audioElement.currentTime = clickPosition * audioElement.duration;
+            state.currentTime = audioElement.currentTime;
+            updateProgressBar();
+            saveState();
+        });
+    }
     
     // Save state before page unload
     window.addEventListener('beforeunload', saveState);
     
+    // Handle View Transitions page swaps - save state before swap
+    document.addEventListener('astro:before-swap', () => {
+        saveState();
+    });
+    
+    // After View Transitions swap - ensure global functions are available
+    document.addEventListener('astro:after-swap', () => {
+        // 重新绑定全局函数供新页面使用
+        window.playAlbum = window.musicPlayerState?.playAlbum || playAlbum;
+        window.playTrack = window.musicPlayerState?.playTrack || playTrack;
+    });
+    
     // Initialize
-    loadState();
-    restoreState();
-    updateVolumeIcon();
+    if (!isInitialized) {
+        loadState();
+        restoreState();
+        updateVolumeIcon();
+        isInitialized = true;
+        
+        // 保存全局函数引用到 window，供 View Transitions 后恢复
+        window.musicPlayerState = {
+            playAlbum: playAlbum,
+            playTrack: playTrack
+        };
+    }
 </script>
 
 <style>

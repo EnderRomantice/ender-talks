@@ -1,11 +1,7 @@
 ---
-import Header from "../components/Header.astro";
-import Footer from "../components/Footer.astro";
-import BaseHead from "../components/BaseHead.astro";
-import MusicPlayer from "../components/MusicPlayer.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
 import { Image } from "astro:assets";
 import { index_img } from "../config/index_img";
-import "../styles/global.css";
 
 const head = {
   title: "Ender Talks",
@@ -13,10 +9,7 @@ const head = {
 }
 ---
 
-<html>
-    <BaseHead title={head.title} description={""} />
-    <Header />
-
+<BaseLayout title={head.title} description={head.description}>
     <div class="grid">
         {
             index_img.map((item) => {
@@ -38,10 +31,7 @@ const head = {
             })
         }
     </div>
-
-    <Footer />
-    <MusicPlayer />
-</html>
+</BaseLayout>
 
 <style>
     .grid {

@@ -1,10 +1,6 @@
 ---
-import Header from "../../components/Header.astro";
-import Footer from "../../components/Footer.astro";
-import BaseHead from "../../components/BaseHead.astro";
-import MusicPlayer from "../../components/MusicPlayer.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
 import { albums } from "../../data/albums";
-import "../../styles/global.css";
 
 const head = {
   title: "Music - Ender Talks",
@@ -12,10 +8,7 @@ const head = {
 }
 ---
 
-<html>
-    <BaseHead title={head.title} description={head.description} />
-    <Header />
-    
+<BaseLayout title={head.title} description={head.description}>
     <main class="music-container">
         
         <h1 class="page-title">Music</h1>
@@ -51,10 +44,7 @@ const head = {
             )}
         </section>
     </main>
-    
-    <Footer />
-    <MusicPlayer />
-</html>
+</BaseLayout>
 
 <style>
     .music-container {
