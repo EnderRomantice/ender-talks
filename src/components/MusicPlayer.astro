@@ -46,8 +46,8 @@ import PlayerShowButton from './PlayerShowButton.astro';
                     <path fill="currentColor" d="M8 5v14l11-7z"/>
                 </svg>
                 <svg viewBox="0 0 24 24" width="32" height="32" id="pause-icon" style="display: none;">
-                    <path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                </svg>
+                    <path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/
+>                </svg>
             </button>
             
             <button class="control-btn" id="next-btn" title="Next">
@@ -68,204 +68,127 @@ import PlayerShowButton from './PlayerShowButton.astro';
     </div>
 </div>
 
-<!-- Render the show button component -->
 <PlayerShowButton />
 
-<!-- Audio element with transition persistence -->
 <audio id="persistent-audio" transition:persist="audio-player"></audio>
 
 <script>
-    import { getState, loadState, saveState } from '../utils/playerState';
-    import type { Track } from '../utils/playerState';
+    import { getPlayerController } from '../utils/playerController';
+    import { loadState, saveState, type Track } from '../utils/playerState';
     
-    const PLAYER_INIT = Symbol.for('musicPlayerCoreInitialized');
+    // DOM Elements cache
+    const elements = {
+        player: null as HTMLElement | null,
+        toggleBtn: null as HTMLElement | null,
+        playBtn: null as HTMLElement | null,
+        prevBtn: null as HTMLElement | null,
+        nextBtn: null as HTMLElement | null,
+        muteBtn: null as HTMLElement | null,
+        volumeSlider: null as HTMLInputElement | null,
+        progressFill: null as HTMLElement | null,
+        currentTime: null as HTMLElement | null,
+        duration: null as HTMLElement | null,
+        title: null as HTMLElement | null,
+        artist: null as HTMLElement | null,
+        albumArt: null as HTMLImageElement | null,
+        placeholder: null as HTMLElement | null,
+        playIcon: null as HTMLElement | null,
+        pauseIcon: null as HTMLElement | null,
+        volumeIcon: null as HTMLElement | null,
+        audio: null as HTMLAudioElement | null,
+    };
     
-    // Prevent duplicate initialization
-    if (window[PLAYER_INIT]) {
-        window.playAlbum = playAlbum;
-        window.playTrack = playTrack;
-        window.playTrackFromBox = playTrackFromBox;
+    // Get controller
+    const controller = getPlayerController();
+    
+    // Get all elements from DOM
+    function getElements() {
+        elements.player = document.getElementById('floating-player');
+        elements.toggleBtn = document.getElementById('player-toggle-btn');
+        elements.playBtn = document.getElementById('play-btn');
+        elements.prevBtn = document.getElementById('prev-btn');
+        elements.nextBtn = document.getElementById('next-btn');
+        elements.muteBtn = document.getElementById('mute-btn');
+        elements.volumeSlider = document.getElementById('volume-slider') as HTMLInputElement;
+        elements.progressFill = document.getElementById('progress-fill');
+        elements.currentTime = document.getElementById('current-time');
+        elements.duration = document.getElementById('duration');
+        elements.title = document.getElementById('player-title');
+        elements.artist = document.getElementById('player-artist');
+        elements.albumArt = document.getElementById('player-album-art') as HTMLImageElement;
+        elements.placeholder = document.getElementById('album-art-placeholder');
+        elements.playIcon = document.getElementById('play-icon');
+        elements.pauseIcon = document.getElementById('pause-icon');
+        elements.volumeIcon = document.getElementById('volume-icon');
+        elements.audio = document.getElementById('persistent-audio') as HTMLAudioElement;
     }
     
-    window[PLAYER_INIT] = true;
-    
-    // DOM Elements
-    const audio = document.getElementById('persistent-audio') as HTMLAudioElement;
-    const floatingPlayer = document.getElementById('floating-player');
-    const toggleBtn = document.getElementById('player-toggle-btn');
-    const playBtn = document.getElementById('play-btn');
-    const prevBtn = document.getElementById('prev-btn');
-    const nextBtn = document.getElementById('next-btn');
-    const muteBtn = document.getElementById('mute-btn');
-    const volumeSlider = document.getElementById('volume-slider') as HTMLInputElement;
-    const progressFill = document.getElementById('progress-fill');
-    const currentTimeEl = document.getElementById('current-time');
-    const durationEl = document.getElementById('duration');
-    const playerTitle = document.getElementById('player-title');
-    const playerArtist = document.getElementById('player-artist');
-    const playerAlbumArt = document.getElementById('player-album-art') as HTMLImageElement;
-    const albumArtPlaceholder = document.getElementById('album-art-placeholder');
-    const playIcon = document.getElementById('play-icon');
-    const pauseIcon = document.getElementById('pause-icon');
-    const volumeIcon = document.getElementById('volume-icon');
-    
-    let progressInterval: number;
-    let isRestoring = false;
-    let isInitialized = false;
-    
-    // Toggle player visibility
-    function toggleVisibility() {
-        const s = getState();
-        s.isVisible = !s.isVisible;
-        updatePlayerVisibility();
-    }
-    
-    function updatePlayerVisibility() {
-        const s = getState();
-        if (s.isVisible) {
-            floatingPlayer?.classList.remove('hidden');
-            floatingPlayer?.classList.add('visible');
+    // Update UI based on state
+    function updateVisibility(isVisible: boolean) {
+        if (!elements.player) return;
+        
+        if (isVisible) {
+            elements.player.classList.remove('hidden');
+            elements.player.classList.add('visible');
         } else {
-            floatingPlayer?.classList.add('hidden');
-            floatingPlayer?.classList.remove('visible');
-        }
-        saveState(audio);
-        // Update button visibility
-        window.updatePlayerVisibility?.();
-    }
-    
-    // Audio controls
-    function togglePlay() {
-        const s = getState();
-        if (!s.currentPlaylist.length) return;
-        
-        s.isPlaying = !s.isPlaying;
-        updatePlayButton();
-        
-        if (s.isPlaying) {
-            startProgress();
-            audio?.play().catch(err => {
-                console.log('Play failed:', err);
-                s.isPlaying = false;
-                updatePlayButton();
-            });
-        } else {
-            stopProgress();
-            audio?.pause();
-        }
-        
-        saveState(audio);
-        // Update button state
-        window.updateShowBtnState?.();
-    }
-    
-    function updatePlayButton() {
-        const s = getState();
-        if (s.isPlaying) {
-            playIcon?.style.setProperty('display', 'none');
-            pauseIcon?.style.setProperty('display', 'block');
-        } else {
-            playIcon?.style.setProperty('display', 'block');
-            pauseIcon?.style.setProperty('display', 'none');
+            elements.player.classList.add('hidden');
+            elements.player.classList.remove('visible');
         }
     }
     
-    function previousTrack() {
-        const s = getState();
-        if (s.currentPlaylist.length > 0) {
-            s.currentTrackIndex = (s.currentTrackIndex - 1 + s.currentPlaylist.length) % s.currentPlaylist.length;
-            loadTrack(s.currentPlaylist[s.currentTrackIndex]);
-        }
-    }
-    
-    function nextTrack() {
-        const s = getState();
-        if (s.currentPlaylist.length > 0) {
-            s.currentTrackIndex = (s.currentTrackIndex + 1) % s.currentPlaylist.length;
-            loadTrack(s.currentPlaylist[s.currentTrackIndex]);
-        }
-    }
-    
-    // Track loading
-    function loadTrack(track: Track) {
-        if (!track || !audio) return;
-        
-        const s = getState();
-        s.currentTrack = track;
-        updateTrackInfo(track);
-        
-        audio.pause();
-        ensureAudioListeners();
-        
-        if (track.file) {
-            audio.src = track.file;
-            audio.volume = (s.volume || 70) / 100;
-            audio.muted = s.isMuted;
-            
-            if (s.isPlaying) {
-                audio.play().catch(err => {
-                    console.log('Auto-play prevented:', err);
-                    s.isPlaying = false;
-                    updatePlayButton();
-                });
-                startProgress();
-            } else {
-                s.currentTime = 0;
-                updateProgressBar();
-            }
-        }
-        
-        saveState(audio);
-        
-        // Show player when track loaded
-        if (!s.isVisible) {
-            s.isVisible = true;
-            updatePlayerVisibility();
-        }
-    }
-    
-    function updateTrackInfo(track: Track) {
+    function updateTrackInfo(track: Track | null) {
         if (!track) return;
         
-        if (playerTitle) playerTitle.textContent = track.title;
-        if (playerArtist) playerArtist.textContent = track.artist || 'Unknown Artist';
+        if (elements.title) elements.title.textContent = track.title;
+        if (elements.artist) elements.artist.textContent = track.artist || 'Unknown Artist';
         
         if (track.cover) {
-            if (playerAlbumArt) {
-                playerAlbumArt.src = track.cover;
-                playerAlbumArt.style.display = 'block';
+            if (elements.albumArt) {
+                elements.albumArt.src = track.cover;
+                elements.albumArt.style.display = 'block';
             }
-            albumArtPlaceholder?.style.setProperty('display', 'none');
+            if (elements.placeholder) elements.placeholder.style.display = 'none';
         } else {
-            if (playerAlbumArt) playerAlbumArt.style.display = 'none';
-            albumArtPlaceholder?.style.setProperty('display', 'flex');
+            if (elements.albumArt) elements.albumArt.style.display = 'none';
+            if (elements.placeholder) elements.placeholder.style.display = 'flex';
         }
     }
     
-    // Progress handling
-    function startProgress() {
-        stopProgress();
-        progressInterval = window.setInterval(() => {
-            if (audio) {
-                getState().currentTime = audio.currentTime;
-                updateProgressBar();
-            }
-        }, 100);
+    function updatePlayButton(isPlaying: boolean) {
+        if (isPlaying) {
+            elements.playIcon?.style.setProperty('display', 'none');
+            elements.pauseIcon?.style.setProperty('display', 'block');
+        } else {
+            elements.playIcon?.style.setProperty('display', 'block');
+            elements.pauseIcon?.style.setProperty('display', 'none');
+        }
     }
     
-    function stopProgress() {
-        clearInterval(progressInterval);
-    }
-    
-    function updateProgressBar() {
-        const s = getState();
-        const duration = audio?.duration || s.duration || 0;
-        const current = audio?.currentTime || s.currentTime || 0;
-        const progress = duration > 0 ? (current / duration) * 100 : 0;
+    function updateVolumeIcon() {
+        if (!elements.volumeIcon || !elements.volumeSlider) return;
         
-        if (progressFill) progressFill.style.width = `${progress}%`;
-        if (currentTimeEl) currentTimeEl.textContent = formatTime(current);
-        if (durationEl) durationEl.textContent = formatTime(duration);
+        const state = controller.getState();
+        const volume = parseInt(elements.volumeSlider.value);
+        
+        if (state.isMuted || volume === 0) {
+            elements.volumeIcon.innerHTML = '<path fill="currentColor" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+        } else if (volume < 50) {
+            elements.volumeIcon.innerHTML = '<path fill="currentColor" d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>';
+        } else {
+            elements.volumeIcon.innerHTML = '<path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+        }
+    }
+    
+    function updateProgress(data: { currentTime: number; duration: number; percentage: number }) {
+        if (elements.progressFill) {
+            elements.progressFill.style.width = `${data.percentage}%`;
+        }
+        if (elements.currentTime) {
+            elements.currentTime.textContent = formatTime(data.currentTime);
+        }
+        if (elements.duration) {
+            elements.duration.textContent = formatTime(data.duration);
+        }
     }
     
     function formatTime(seconds: number): string {
@@ -275,114 +198,120 @@ import PlayerShowButton from './PlayerShowButton.astro';
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
     
-    // Volume control
-    function toggleMute() {
-        const s = getState();
-        s.isMuted = !s.isMuted;
-        if (audio) audio.muted = s.isMuted;
-        updateVolumeIcon();
-        saveState(audio);
-    }
-    
-    function updateVolumeIcon() {
-        const s = getState();
-        if (!volumeIcon) return;
-        
-        if (s.isMuted || volumeSlider.value === '0') {
-            volumeIcon.innerHTML = '<path fill="currentColor" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
-        } else if (parseInt(volumeSlider.value) < 50) {
-            volumeIcon.innerHTML = '<path fill="currentColor" d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>';
-        } else {
-            volumeIcon.innerHTML = '<path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
-        }
-    }
-    
-    // Audio event listeners
-    function ensureAudioListeners() {
-        if (audio?.__listenersBound) return;
-        
-        audio?.addEventListener('ended', nextTrack);
-        audio?.addEventListener('loadedmetadata', () => {
-            if (!isRestoring) {
-                getState().duration = audio.duration;
-                updateProgressBar();
-                saveState(audio);
-            }
+    // Bind events
+    function bindEvents() {
+        // Toggle visibility
+        controller.bindElement(elements.toggleBtn, 'click', () => {
+            controller.toggleVisibility();
         });
         
-        (audio as any).__listenersBound = true;
+        // Play/Pause
+        controller.bindElement(elements.playBtn, 'click', () => {
+            controller.togglePlay();
+        });
+        
+        // Previous
+        controller.bindElement(elements.prevBtn, 'click', () => {
+            controller.previousTrack();
+        });
+        
+        // Next
+        controller.bindElement(elements.nextBtn, 'click', () => {
+            controller.nextTrack();
+        });
+        
+        // Mute
+        controller.bindElement(elements.muteBtn, 'click', () => {
+            controller.toggleMute();
+        });
+        
+        // Volume
+        controller.bindElement(elements.volumeSlider, 'input', (e: Event) => {
+            const value = parseInt((e.target as HTMLInputElement).value);
+            controller.setVolume(value);
+        });
+        
+        // Progress bar click
+        const progressBar = document.querySelector('.progress-bar');
+        if (progressBar) {
+            progressBar.addEventListener('click', (e: Event) => {
+                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                const percentage = ((e as MouseEvent).clientX - rect.left) / rect.width;
+                controller.seekTo(percentage);
+            });
+        }
     }
     
-    // State restoration
-    function restoreState() {
-        const s = getState();
-        if (!s.currentTrack || !s.currentPlaylist.length || !audio) return;
+    // Subscribe to controller events
+    function subscribe() {
+        controller.on('visibilityChange', updateVisibility);
+        controller.on('trackChange', updateTrackInfo);
+        controller.on('playStateChange', updatePlayButton);
+        controller.on('progress', updateProgress);
+        controller.on('volumeChange', updateVolumeIcon);
+        controller.on('muteChange', updateVolumeIcon);
+    }
+    
+    // Restore state
+    function restore() {
+        const state = controller.getState();
         
-        isRestoring = true;
-        updatePlayerVisibility();
-        
-        if (s.volume !== undefined && volumeSlider) {
-            volumeSlider.value = s.volume.toString();
+        if (state.volume !== undefined && elements.volumeSlider) {
+            elements.volumeSlider.value = state.volume.toString();
         }
         
-        updateTrackInfo(s.currentTrack);
-        ensureAudioListeners();
+        updateVisibility(state.isVisible);
+        updateTrackInfo(state.currentTrack);
+        updatePlayButton(state.isPlaying);
+        updateVolumeIcon();
         
-        if (s.currentTrack.file) {
-            audio.src = s.currentTrack.file;
-            audio.volume = (s.volume || 70) / 100;
-            audio.muted = s.isMuted;
-            updatePlayButton();
-            updateVolumeIcon();
+        // Setup audio element
+        if (elements.audio) {
+            controller.setAudioElement(elements.audio);
             
-            if (s.currentTime > 0) {
-                audio.currentTime = s.currentTime;
-            }
-            
-            if (s.isPlaying) {
-                audio.play().then(() => startProgress()).catch(err => {
-                    console.log('Auto-play prevented:', err);
-                    s.isPlaying = false;
-                    updatePlayButton();
-                });
+            if (state.currentTrack?.file) {
+                elements.audio.src = state.currentTrack.file;
+                elements.audio.volume = (state.volume || 70) / 100;
+                elements.audio.muted = state.isMuted;
+                
+                if (state.currentTime > 0) {
+                    elements.audio.currentTime = state.currentTime;
+                }
+                
+                if (state.isPlaying) {
+                    elements.audio.play().catch(console.error);
+                }
             }
         }
-        
-        isRestoring = false;
     }
     
-    // Global functions
-    function playAlbum(album: any, startIndex = 0) {
-        console.log('[MusicPlayer] playAlbum:', album?.title);
-        if (!album?.songs?.length) return;
-        
-        const s = getState();
-        s.currentPlaylist = album.songs.map((song: any, index: number) => ({
-            ...song,
-            album: album.title,
-            artist: album.artist,
-            cover: album.cover
-        }));
-        s.currentTrackIndex = startIndex;
-        s.isPlaying = true;
-        loadTrack(s.currentPlaylist[startIndex]);
-        updatePlayButton();
-        saveState(audio);
-        window.updateShowBtnState?.();
+    // Initialize
+    function init() {
+        getElements();
+        bindEvents();
+        subscribe();
+        restore();
     }
     
-    function playTrack(track: Track) {
-        const s = getState();
-        s.currentPlaylist = [track];
-        s.currentTrackIndex = 0;
-        s.isPlaying = true;
-        loadTrack(track);
-        updatePlayButton();
-        saveState(audio);
-        window.updateShowBtnState?.();
-    }
+    // First load
+    init();
     
-    function playTrackFromBox(albumId: string, songTitle: string) {
+    // View transition
+    document.addEventListener('astro:after-swap', () => {
+        getElements();
+        bindEvents();
+        restore();
+    });
+    
+    // Save state on unload
+    window.addEventListener('beforeunload', () => {
+        saveState(elements.audio || undefined);
+    });
+    
+    // Expose global functions for external use
+    window.playAlbum = (album: any, startIndex?: number) => controller.playAlbum(album, startIndex);
+    window.playTrack = (track: Track) => controller.playTrack(track);
+    window.playTrackFromBox = (albumId: string, songTitle: string) => {
         const albums = (window as any).__MUSIC_ALBUMS__;
         if (!albums) return;
         
@@ -392,82 +321,16 @@ import PlayerShowButton from './PlayerShowButton.astro';
         const song = album.songs.find((s: any) => s.title === songTitle);
         if (!song) return;
         
-        playTrack({
+        controller.playTrack({
             ...song,
             album: album.title,
             artist: album.artist,
             cover: album.cover
         });
-    }
-    
-    // Event bindings
-    function bindEvents() {
-        toggleBtn?.addEventListener('click', () => {
-            toggleVisibility();
-        });
-        
-        playBtn?.addEventListener('click', togglePlay);
-        prevBtn?.addEventListener('click', () => { previousTrack(); saveState(audio); });
-        nextBtn?.addEventListener('click', () => { nextTrack(); saveState(audio); });
-        muteBtn?.addEventListener('click', toggleMute);
-        
-        volumeSlider?.addEventListener('input', (e) => {
-            const newVolume = parseInt((e.target as HTMLInputElement).value);
-            getState().volume = newVolume;
-            if (audio) audio.volume = newVolume / 100;
-            updateVolumeIcon();
-            saveState(audio);
-        });
-        
-        document.querySelector('.progress-bar')?.addEventListener('click', (e) => {
-            if (!audio) return;
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-            const clickPosition = (e.clientX - rect.left) / rect.width;
-            audio.currentTime = clickPosition * audio.duration;
-            getState().currentTime = audio.currentTime;
-            updateProgressBar();
-            saveState(audio);
-        });
-        
-        // Listen for toggle event from button component
-        window.addEventListener('player-toggle-visibility', () => {
-            toggleVisibility();
-        });
-    }
-    
-    // Initialize
-    function init() {
-        if (isInitialized) return;
-        
-        loadState();
-        updatePlayerVisibility();
-        restoreState();
-        updateVolumeIcon();
-        bindEvents();
-        
-        isInitialized = true;
-        
-        // Expose global functions
-        window.playAlbum = playAlbum;
-        window.playTrack = playTrack;
-        window.playTrackFromBox = playTrackFromBox;
-    }
-    
-    // Page lifecycle
-    window.addEventListener('beforeunload', () => saveState(audio));
-    document.addEventListener('astro:before-swap', () => saveState(audio));
-    document.addEventListener('astro:after-swap', () => {
-        window.playAlbum = playAlbum;
-        window.playTrack = playTrack;
-        window.playTrackFromBox = playTrackFromBox;
-    });
-    
-    // Start
-    init();
+    };
 </script>
 
 <style>
-    /* Player container styles */
     .floating-player {
         position: fixed;
         top: 100px;
@@ -518,7 +381,6 @@ import PlayerShowButton from './PlayerShowButton.astro';
         padding: 1.2em;
     }
     
-    /* Now playing section */
     .now-playing {
         display: flex;
         align-items: center;
@@ -575,7 +437,6 @@ import PlayerShowButton from './PlayerShowButton.astro';
         text-overflow: ellipsis;
     }
     
-    /* Progress bar */
     .progress-container {
         display: flex;
         align-items: center;
@@ -608,7 +469,6 @@ import PlayerShowButton from './PlayerShowButton.astro';
         width: 0%;
     }
     
-    /* Controls */
     .controls {
         display: flex;
         justify-content: center;
@@ -646,7 +506,6 @@ import PlayerShowButton from './PlayerShowButton.astro';
         background: var(--accent-dark);
     }
     
-    /* Volume */
     .volume-container {
         display: flex;
         align-items: center;
@@ -684,7 +543,6 @@ import PlayerShowButton from './PlayerShowButton.astro';
         border: none;
     }
     
-    /* Responsive */
     @media (max-width: 720px) {
         .floating-player {
             left: 0;

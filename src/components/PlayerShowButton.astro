@@ -11,109 +11,99 @@
 </button>
 
 <script>
-    import { getState, type PlayerState } from '../utils/playerState';
+    import { getPlayerController } from '../utils/playerController';
     import { updatePulseColor } from '../utils/coverColor';
     
-    const BUTTON_INITIALIZED = Symbol.for('playerShowButtonInitialized');
+    // Elements
+    let btn: HTMLElement | null = null;
+    let cover: HTMLImageElement | null = null;
+    let icon: SVGElement | null = null;
     
-    if (window[BUTTON_INITIALIZED]) {
-        // Re-initialize for new DOM after page transition
-        initButton();
-    }
+    // Get controller instance
+    const controller = getPlayerController();
     
-    window[BUTTON_INITIALIZED] = true;
-    
-    let playerShowBtn: HTMLElement | null = null;
-    let playerShowBtnCover: HTMLImageElement | null = null;
-    let playerShowBtnIcon: SVGElement | null = null;
-    
-    function getElements() {
-        playerShowBtn = document.getElementById('player-show-btn');
-        playerShowBtnCover = playerShowBtn?.querySelector('.album-cover') as HTMLImageElement;
-        playerShowBtnIcon = playerShowBtn?.querySelector('.default-icon') as SVGElement;
-    }
-    
-    export function updateShowBtnState() {
-        const s = getState();
-        const hasTrack = s.currentTrack && s.currentTrack.cover;
+    // Update UI based on state
+    function updateUI() {
+        const state = controller.getState();
+        const hasTrack = state.currentTrack && state.currentTrack.cover;
         
-        if (!playerShowBtn) return;
+        if (!btn) return;
         
         if (hasTrack) {
-            playerShowBtn.classList.add('playing');
-            if (playerShowBtnCover) {
-                playerShowBtnCover.src = s.currentTrack!.cover!;
-                playerShowBtnCover.style.display = 'block';
+            btn.classList.add('playing');
+            if (cover && state.currentTrack!.cover) {
+                cover.src = state.currentTrack!.cover;
+                cover.style.display = 'block';
             }
-            if (playerShowBtnIcon) {
-                playerShowBtnIcon.style.display = 'none';
-            }
+            if (icon) icon.style.display = 'none';
             
-            // Pulse animation only when playing
-            if (s.isPlaying) {
-                playerShowBtn.classList.add('pulse');
+            // Pulse animation
+            if (state.isPlaying) {
+                btn.classList.add('pulse');
             } else {
-                playerShowBtn.classList.remove('pulse');
+                btn.classList.remove('pulse');
             }
             
             // Update pulse color
-            updatePulseColor(s.currentTrack!.cover, playerShowBtn);
+            updatePulseColor(state.currentTrack!.cover, btn);
         } else {
-            playerShowBtn.classList.remove('playing');
-            playerShowBtn.classList.remove('pulse');
-            if (playerShowBtnCover) {
-                playerShowBtnCover.style.display = 'none';
-            }
-            if (playerShowBtnIcon) {
-                playerShowBtnIcon.style.display = 'block';
-            }
-            updatePulseColor(null, playerShowBtn);
+            btn.classList.remove('playing', 'pulse');
+            if (cover) cover.style.display = 'none';
+            if (icon) icon.style.display = 'block';
+            updatePulseColor(null, btn);
         }
-    }
-    
-    export function toggleVisibility() {
-        const s = getState();
-        s.isVisible = !s.isVisible;
-        updatePlayerVisibility();
-    }
-    
-    export function updatePlayerVisibility() {
-        const s = getState();
-        if (s.isVisible) {
-            playerShowBtn?.classList.add('hidden');
-        } else {
-            playerShowBtn?.classList.remove('hidden');
-        }
-    }
-    
-    function initButton() {
-        getElements();
         
-        // Bind click event
-        playerShowBtn?.addEventListener('click', () => {
-            toggleVisibility();
-            // Notify parent component
-            window.dispatchEvent(new CustomEvent('player-toggle-visibility'));
+        // Show/hide button based on visibility
+        if (state.isVisible) {
+            btn.classList.add('hidden');
+        } else {
+            btn.classList.remove('hidden');
+        }
+    }
+    
+    // Get elements from DOM
+    function getElements() {
+        btn = document.getElementById('player-show-btn');
+        cover = btn?.querySelector('.album-cover') as HTMLImageElement;
+        icon = btn?.querySelector('.default-icon') as SVGElement;
+    }
+    
+    // Bind click event
+    function bindEvents() {
+        if (!btn) return;
+        
+        // Add click handler using controller's bindElement method
+        controller.bindElement(btn, 'click', () => {
+            controller.toggleVisibility();
         });
-        
-        // Initial state update
-        updateShowBtnState();
-        updatePlayerVisibility();
     }
+    
+    // Initialize
+    function init() {
+        getElements();
+        bindEvents();
+        updateUI();
+    }
+    
+    // Subscribe to state changes
+    controller.on('visibilityChange', updateUI);
+    controller.on('trackChange', updateUI);
+    controller.on('playStateChange', updateUI);
     
     // Initialize on first load
-    initButton();
+    init();
     
     // Re-initialize after view transitions
     document.addEventListener('astro:after-swap', () => {
-        getElements();
-        updateShowBtnState();
-        updatePlayerVisibility();
+        init();
     });
     
-    // Expose functions globally
-    window.updateShowBtnState = updateShowBtnState;
-    window.updatePlayerVisibility = updatePlayerVisibility;
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+        controller.off('visibilityChange', updateUI);
+        controller.off('trackChange', updateUI);
+        controller.off('playStateChange', updateUI);
+    });
 </script>
 
 <style>

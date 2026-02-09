@@ -81,7 +81,8 @@ export function loadState(): boolean {
 declare global {
     interface Window {
         __PLAYER_STATE__: PlayerState;
-        updateShowBtnState: () => void;
-        updatePlayerVisibility: () => void;
+        playAlbum: (album: any, startIndex?: number) => void;
+        playTrack: (track: any) => void;
+        playTrackFromBox: (albumId: string, songTitle: string) => void;
     }
 }
