@@ -4,7 +4,7 @@ description: '一次由 View Transitions 引发的播放器状态同步惨案'
 pubDate: '9 02 2026'
 language: 'AI Spawn'
 ---
-
+> 注意！此文章AI生成，仅用于个人记录该项目遇到的一些issue
 ## 事故现场
 
 最近给博客加了音乐播放器功能，一开始美滋滋：能在专辑页面点歌播放，也能在 blog 里用 MusicBox 组件插入音乐。
