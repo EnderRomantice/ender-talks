@@ -1,4 +1,5 @@
 ---
+import PlayerShowButton from './PlayerShowButton.astro';
 ---
 
 <div id="floating-player" class="floating-player hidden" transition:persist="music-player">
@@ -67,348 +68,73 @@
     </div>
 </div>
 
-<button id="player-show-btn" class="player-show-btn hidden" title="Show Player" transition:persist="player-show-btn">
-    <svg class="default-icon" viewBox="0 0 24 24" width="24" height="24">
-        <path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-    </svg>
-    <img class="album-cover" src="" alt="Album Cover" style="display: none;">
-</button>
+<!-- Render the show button component -->
+<PlayerShowButton />
 
-<!-- 使用真实的 audio DOM 元素，这样 transition:persist 可以保持播放状态 -->
+<!-- Audio element with transition persistence -->
 <audio id="persistent-audio" transition:persist="audio-player"></audio>
 
 <script>
-    // 使用 Symbol 创建全局唯一标识符，确保脚本只初始化一次
-    const PLAYER_INITIALIZED = Symbol.for('musicPlayerInitialized');
+    import { getState, loadState, saveState } from '../utils/playerState';
+    import type { Track } from '../utils/playerState';
     
-    // 如果已经初始化过，跳过重复初始化（View Transitions 保持组件时）
-    if (window[PLAYER_INITIALIZED]) {
-        // 只需重新暴露全局函数供新页面使用（这些函数会操作 window.__PLAYER_STATE__）
+    const PLAYER_INIT = Symbol.for('musicPlayerCoreInitialized');
+    
+    // Prevent duplicate initialization
+    if (window[PLAYER_INIT]) {
         window.playAlbum = playAlbum;
         window.playTrack = playTrack;
         window.playTrackFromBox = playTrackFromBox;
     }
     
-    window[PLAYER_INITIALIZED] = true;
+    window[PLAYER_INIT] = true;
     
-    const STORAGE_KEY = 'musicPlayerState';
-    
-    // 将状态挂载到 window，所有函数共享同一个状态对象
-    if (!window.__PLAYER_STATE__) {
-        window.__PLAYER_STATE__ = {
-            isPlaying: false,
-            currentTrackIndex: 0,
-            currentPlaylist: [],
-            isMuted: false,
-            isVisible: false,
-            currentTime: 0,
-            duration: 0,
-            currentTrack: null,
-            volume: 10
-        };
-    }
-    
-    // 辅助函数：获取当前状态（总是从 window 读取）
-    function getState() {
-        return window.__PLAYER_STATE__;
-    }
-    
-    let progressInterval;
-    let isRestoring = false;
-    let isInitialized = false;
-    
-    // 获取持久化的 DOM audio 元素（transition:persist 会保持这个元素）
-    const audioElement = document.getElementById('persistent-audio');
-    
+    // DOM Elements
+    const audio = document.getElementById('persistent-audio') as HTMLAudioElement;
     const floatingPlayer = document.getElementById('floating-player');
-    const playerShowBtn = document.getElementById('player-show-btn');
     const toggleBtn = document.getElementById('player-toggle-btn');
     const playBtn = document.getElementById('play-btn');
     const prevBtn = document.getElementById('prev-btn');
     const nextBtn = document.getElementById('next-btn');
     const muteBtn = document.getElementById('mute-btn');
-    const playIcon = document.getElementById('play-icon');
-    const pauseIcon = document.getElementById('pause-icon');
-    const volumeIcon = document.getElementById('volume-icon');
+    const volumeSlider = document.getElementById('volume-slider') as HTMLInputElement;
     const progressFill = document.getElementById('progress-fill');
     const currentTimeEl = document.getElementById('current-time');
     const durationEl = document.getElementById('duration');
     const playerTitle = document.getElementById('player-title');
     const playerArtist = document.getElementById('player-artist');
-    const playerAlbumArt = document.getElementById('player-album-art');
+    const playerAlbumArt = document.getElementById('player-album-art') as HTMLImageElement;
     const albumArtPlaceholder = document.getElementById('album-art-placeholder');
-    const volumeSlider = document.getElementById('volume-slider');
-    const toggleIcon = toggleBtn?.querySelector('.toggle-icon path');
-    const playerShowBtnCover = playerShowBtn?.querySelector('.album-cover');
-    const playerShowBtnIcon = playerShowBtn?.querySelector('.default-icon');
+    const playIcon = document.getElementById('play-icon');
+    const pauseIcon = document.getElementById('pause-icon');
+    const volumeIcon = document.getElementById('volume-icon');
     
-    // Cover color cache
-    const COLOR_CACHE_KEY = 'musicPlayerCoverColors';
-    const COLOR_CACHE_VERSION = 'v2'; // 缓存版本号，算法更新时递增
-    let coverColorCache = {};
+    let progressInterval: number;
+    let isRestoring = false;
+    let isInitialized = false;
     
-    // Load color cache from localStorage
-    function loadColorCache() {
-        try {
-            const cached = localStorage.getItem(COLOR_CACHE_KEY);
-            const version = localStorage.getItem(COLOR_CACHE_KEY + '_version');
-            
-            // Clear cache if version mismatch (algorithm updated)
-            if (cached && version === COLOR_CACHE_VERSION) {
-                coverColorCache = JSON.parse(cached);
-            } else {
-                // Clear old cache
-                coverColorCache = {};
-                localStorage.removeItem(COLOR_CACHE_KEY);
-                localStorage.setItem(COLOR_CACHE_KEY + '_version', COLOR_CACHE_VERSION);
-            }
-        } catch (e) {
-            console.error('Failed to load color cache:', e);
-        }
-    }
-    
-    // Save color cache to localStorage
-    function saveColorCache() {
-        try {
-            localStorage.setItem(COLOR_CACHE_KEY, JSON.stringify(coverColorCache));
-        } catch (e) {
-            console.error('Failed to save color cache:', e);
-        }
-    }
-    
-    // Extract dominant color from image using canvas
-    async function extractCoverColor(imageUrl) {
-        // Check cache first
-        if (coverColorCache[imageUrl]) {
-            return coverColorCache[imageUrl];
-        }
-        
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            
-            img.onload = () => {
-                try {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    // Use larger size for better accuracy
-                    canvas.width = 100;
-                    canvas.height = 100;
-                    
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    
-                    // Sample center region (40% of image) - usually the main artwork
-                    const centerSize = 40;
-                    const startX = (canvas.width - centerSize) / 2;
-                    const startY = (canvas.height - centerSize) / 2;
-                    
-                    const imageData = ctx.getImageData(startX, startY, centerSize, centerSize);
-                    const data = imageData.data;
-                    
-                    // Use weighted average with emphasis on vibrant colors
-                    let r = 0, g = 0, b = 0, totalWeight = 0;
-                    
-                    for (let i = 0; i < data.length; i += 4) {
-                        const pixelR = data[i];
-                        const pixelG = data[i + 1];
-                        const pixelB = data[i + 2];
-                        
-                        // Calculate saturation (vibrancy)
-                        const max = Math.max(pixelR, pixelG, pixelB);
-                        const min = Math.min(pixelR, pixelG, pixelB);
-                        const saturation = max === 0 ? 0 : (max - min) / max;
-                        
-                        // Weight by saturation - vibrant colors get higher weight
-                        const weight = 0.3 + saturation * 0.7;
-                        
-                        r += pixelR * weight;
-                        g += pixelG * weight;
-                        b += pixelB * weight;
-                        totalWeight += weight;
-                    }
-                    
-                    if (totalWeight > 0) {
-                        r = Math.round(r / totalWeight);
-                        g = Math.round(g / totalWeight);
-                        b = Math.round(b / totalWeight);
-                    } else {
-                        r = 35; g = 55; b = 255;
-                    }
-                    
-                    const color = `${r}, ${g}, ${b}`;
-                    console.log('[MusicPlayer] Extracted color:', color, 'from', imageUrl);
-                    
-                    // Cache the result
-                    coverColorCache[imageUrl] = color;
-                    saveColorCache();
-                    
-                    resolve(color);
-                } catch (e) {
-                    console.error('Failed to extract color:', e);
-                    resolve('35, 55, 255');
-                }
-            };
-            
-            img.onerror = () => {
-                resolve('35, 55, 255');
-            };
-            
-            img.src = imageUrl;
-        });
-    }
-    
-    // Update pulse animation color
-    async function updatePulseColor(imageUrl) {
-        if (!imageUrl) {
-            // Use default color
-            updatePulseStyle('35, 55, 255');
-            return;
-        }
-        
-        const color = await extractCoverColor(imageUrl);
-        updatePulseStyle(color);
-    }
-    
-    // Update CSS custom property for pulse color
-    function updatePulseStyle(color) {
-        console.log('[MusicPlayer] Updating pulse color to:', color);
-        if (playerShowBtn) {
-            playerShowBtn.style.setProperty('--pulse-color', color);
-            console.log('[MusicPlayer] Pulse color set on button');
-        } else {
-            console.error('[MusicPlayer] playerShowBtn not found!');
-        }
-    }
-    
-    // Load color cache on startup
-    loadColorCache();
-    
-    // Save state to localStorage
-    function saveState() {
-        try {
-            const s = getState();
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({
-                isPlaying: s.isPlaying,
-                currentTrackIndex: s.currentTrackIndex,
-                currentPlaylist: s.currentPlaylist,
-                isMuted: s.isMuted,
-                isVisible: s.isVisible,
-                currentTime: audioElement ? audioElement.currentTime : s.currentTime,
-                duration: audioElement ? audioElement.duration : s.duration,
-                currentTrack: s.currentTrack,
-                volume: s.volume,
-                savedAt: Date.now()
-            }));
-        } catch (e) {
-            console.error('Failed to save player state:', e);
-        }
-    }
-    
-    // Load state from localStorage
-    function loadState() {
-        try {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                // Only restore if saved within last 30 minutes
-                if (Date.now() - (parsed.savedAt || 0) < 30 * 60 * 1000) {
-                    Object.assign(getState(), parsed);
-                    return true;
-                }
-            }
-        } catch (e) {
-            console.error('Failed to load player state:', e);
-        }
-        return false;
-    }
-    
-    // Restore player state
-    function restoreState() {
+    // Toggle player visibility
+    function toggleVisibility() {
         const s = getState();
-        if (!s.currentTrack || !s.currentPlaylist.length || !audioElement) return;
-        
-        isRestoring = true;
-        
-        // Restore visibility
+        s.isVisible = !s.isVisible;
         updatePlayerVisibility();
-        
-        // Restore volume
-        if (s.volume !== undefined) {
-            volumeSlider.value = s.volume;
-        }
-        
-        // Restore track info
-        updateTrackInfo(s.currentTrack);
-        
-        // Use existing DOM audio element (persisted by View Transitions)
-        if (s.currentTrack.file) {
-            ensureAudioListeners();
-            
-            audioElement.src = s.currentTrack.file;
-            audioElement.volume = (s.volume || 70) / 100;
-            audioElement.muted = s.isMuted;
-            
-            // Update button state
-            updatePlayButton();
-            updateVolumeIcon();
-            
-            if (s.currentTime > 0) {
-                audioElement.currentTime = s.currentTime;
-            }
-            
-            // If was playing, start playing
-            if (s.isPlaying) {
-                audioElement.play().then(() => {
-                    startProgress();
-                }).catch(err => {
-                    console.log('Auto-play prevented:', err);
-                    s.isPlaying = false;
-                    updatePlayButton();
-                });
-            }
-        }
-        
-        isRestoring = false;
-    }
-    
-    function onLoadedMetadata() {
-        if (audioElement && !isRestoring) {
-            getState().duration = audioElement.duration;
-            updateProgressBar();
-            saveState();
-        }
-    }
-    
-    function ensureAudioListeners() {
-        if (!audioElement || audioElement.__listenersBound) return;
-        
-        audioElement.addEventListener('ended', onTrackEnded);
-        audioElement.addEventListener('loadedmetadata', onLoadedMetadata);
-        audioElement.__listenersBound = true;
     }
     
     function updatePlayerVisibility() {
-        if (getState().isVisible) {
-            floatingPlayer.classList.remove('hidden');
-            floatingPlayer.classList.add('visible');
-            playerShowBtn.classList.add('hidden');
-            if (toggleIcon) {
-                toggleIcon.setAttribute('d', 'M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z');
-            }
+        const s = getState();
+        if (s.isVisible) {
+            floatingPlayer?.classList.remove('hidden');
+            floatingPlayer?.classList.add('visible');
         } else {
-            floatingPlayer.classList.add('hidden');
-            floatingPlayer.classList.remove('visible');
-            playerShowBtn.classList.remove('hidden');
+            floatingPlayer?.classList.add('hidden');
+            floatingPlayer?.classList.remove('visible');
         }
-        saveState();
+        saveState(audio);
+        // Update button visibility
+        window.updatePlayerVisibility?.();
     }
     
-    function toggleVisibility() {
-        getState().isVisible = !getState().isVisible;
-        updatePlayerVisibility();
-    }
-    
+    // Audio controls
     function togglePlay() {
         const s = getState();
         if (!s.currentPlaylist.length) return;
@@ -418,87 +144,30 @@
         
         if (s.isPlaying) {
             startProgress();
-            if (audioElement) {
-                audioElement.play().catch(err => {
-                    console.log('Play failed:', err);
-                    s.isPlaying = false;
-                    updatePlayButton();
-                });
-            }
+            audio?.play().catch(err => {
+                console.log('Play failed:', err);
+                s.isPlaying = false;
+                updatePlayButton();
+            });
         } else {
             stopProgress();
-            if (audioElement) {
-                audioElement.pause();
-            }
+            audio?.pause();
         }
         
-        saveState();
+        saveState(audio);
+        // Update button state
+        window.updateShowBtnState?.();
     }
     
     function updatePlayButton() {
-        if (getState().isPlaying) {
-            playIcon.style.display = 'none';
-            pauseIcon.style.display = 'block';
-        } else {
-            playIcon.style.display = 'block';
-            pauseIcon.style.display = 'none';
-        }
-        // 同步更新展开按钮状态
-        updateShowBtnState();
-    }
-    
-    function updateVolumeIcon() {
-        if (getState().isMuted || volumeSlider.value == 0) {
-            volumeIcon.innerHTML = '<path fill="currentColor" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
-        } else if (volumeSlider.value < 50) {
-            volumeIcon.innerHTML = '<path fill="currentColor" d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>';
-        } else {
-            volumeIcon.innerHTML = '<path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
-        }
-    }
-    
-    function toggleMute() {
         const s = getState();
-        s.isMuted = !s.isMuted;
-        if (audioElement) {
-            audioElement.muted = s.isMuted;
+        if (s.isPlaying) {
+            playIcon?.style.setProperty('display', 'none');
+            pauseIcon?.style.setProperty('display', 'block');
+        } else {
+            playIcon?.style.setProperty('display', 'block');
+            pauseIcon?.style.setProperty('display', 'none');
         }
-        updateVolumeIcon();
-        saveState();
-    }
-    
-    function startProgress() {
-      
-        stopProgress();
-        
-        progressInterval = setInterval(() => {
-            if (audioElement) {
-                getState().currentTime = audioElement.currentTime;
-                updateProgressBar();
-            }
-        }, 100);
-    }
-    
-    function stopProgress() {
-        clearInterval(progressInterval);
-    }
-    
-    function updateProgressBar() {
-        const s = getState();
-        const duration = audioElement?.duration || s.duration || 0;
-        const current = audioElement?.currentTime || s.currentTime || 0;
-        const progress = duration > 0 ? (current / duration) * 100 : 0;
-        
-        progressFill.style.width = `${progress}%`;
-        currentTimeEl.textContent = formatTime(current);
-        durationEl.textContent = formatTime(duration);
-    }
-    
-    function formatTime(seconds) {
-        if (isNaN(seconds)) return '0:00';
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
     
     function previousTrack() {
@@ -517,79 +186,24 @@
         }
     }
     
-    function updateTrackInfo(track) {
-        if (!track) return;
-        
-        playerTitle.textContent = track.title;
-        playerArtist.textContent = track.artist || 'Unknown Artist';
-        
-        if (track.cover) {
-            playerAlbumArt.src = track.cover;
-            playerAlbumArt.style.display = 'block';
-            if (albumArtPlaceholder) albumArtPlaceholder.style.display = 'none';
-            // 同时更新展开按钮的封面
-            if (playerShowBtnCover) {
-                playerShowBtnCover.src = track.cover;
-            }
-            // 提取并应用封面颜色到脉冲动画
-            updatePulseColor(track.cover);
-        } else {
-            playerAlbumArt.style.display = 'none';
-            if (albumArtPlaceholder) albumArtPlaceholder.style.display = 'flex';
-            if (playerShowBtnCover) {
-                playerShowBtnCover.src = '';
-            }
-            // Reset to default color
-            updatePulseColor(null);
-        }
-    }
-    
-    function updateShowBtnState() {
-        const s = getState();
-        const hasTrack = s.currentTrack && s.currentTrack.cover;
-        
-        if (hasTrack) {
-            // 有歌曲时显示封面
-            playerShowBtn?.classList.add('playing');
-            if (playerShowBtnCover) playerShowBtnCover.style.display = 'block';
-            if (playerShowBtnIcon) playerShowBtnIcon.style.display = 'none';
-            
-            // 只有播放时才有脉冲效果
-            if (s.isPlaying) {
-                playerShowBtn?.classList.add('pulse');
-            } else {
-                playerShowBtn?.classList.remove('pulse');
-            }
-        } else {
-            // 没有歌曲时显示默认图标
-            playerShowBtn?.classList.remove('playing');
-            playerShowBtn?.classList.remove('pulse');
-            if (playerShowBtnCover) playerShowBtnCover.style.display = 'none';
-            if (playerShowBtnIcon) playerShowBtnIcon.style.display = 'block';
-        }
-    }
-    
-    function loadTrack(track) {
-        if (!track || !audioElement) return;
+    // Track loading
+    function loadTrack(track: Track) {
+        if (!track || !audio) return;
         
         const s = getState();
         s.currentTrack = track;
         updateTrackInfo(track);
         
-        // 使用现有的 DOM audio 元素（由 transition:persist 保持）
-        // 暂停当前播放
-        audioElement.pause();
-        
-        // 确保事件监听器只绑定一次
+        audio.pause();
         ensureAudioListeners();
         
         if (track.file) {
-            audioElement.src = track.file;
-            audioElement.volume = (s.volume || 70) / 100;
-            audioElement.muted = s.isMuted;
+            audio.src = track.file;
+            audio.volume = (s.volume || 70) / 100;
+            audio.muted = s.isMuted;
             
             if (s.isPlaying) {
-                audioElement.play().catch(err => {
+                audio.play().catch(err => {
                     console.log('Auto-play prevented:', err);
                     s.isPlaying = false;
                     updatePlayButton();
@@ -601,7 +215,7 @@
             }
         }
         
-        saveState();
+        saveState(audio);
         
         // Show player when track loaded
         if (!s.isVisible) {
@@ -610,21 +224,140 @@
         }
     }
     
-    function onTrackEnded() {
-        nextTrack();
+    function updateTrackInfo(track: Track) {
+        if (!track) return;
+        
+        if (playerTitle) playerTitle.textContent = track.title;
+        if (playerArtist) playerArtist.textContent = track.artist || 'Unknown Artist';
+        
+        if (track.cover) {
+            if (playerAlbumArt) {
+                playerAlbumArt.src = track.cover;
+                playerAlbumArt.style.display = 'block';
+            }
+            albumArtPlaceholder?.style.setProperty('display', 'none');
+        } else {
+            if (playerAlbumArt) playerAlbumArt.style.display = 'none';
+            albumArtPlaceholder?.style.setProperty('display', 'flex');
+        }
     }
     
-    // Global function to play album
-    function playAlbum(album, startIndex = 0) {
-        console.log('[MusicPlayer] playAlbum called:', album?.title, 'startIndex:', startIndex);
+    // Progress handling
+    function startProgress() {
+        stopProgress();
+        progressInterval = window.setInterval(() => {
+            if (audio) {
+                getState().currentTime = audio.currentTime;
+                updateProgressBar();
+            }
+        }, 100);
+    }
+    
+    function stopProgress() {
+        clearInterval(progressInterval);
+    }
+    
+    function updateProgressBar() {
         const s = getState();
+        const duration = audio?.duration || s.duration || 0;
+        const current = audio?.currentTime || s.currentTime || 0;
+        const progress = duration > 0 ? (current / duration) * 100 : 0;
         
-        if (!album || !album.songs || !album.songs.length) {
-            console.error('[MusicPlayer] Invalid album data:', album);
-            return;
+        if (progressFill) progressFill.style.width = `${progress}%`;
+        if (currentTimeEl) currentTimeEl.textContent = formatTime(current);
+        if (durationEl) durationEl.textContent = formatTime(duration);
+    }
+    
+    function formatTime(seconds: number): string {
+        if (isNaN(seconds)) return '0:00';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    // Volume control
+    function toggleMute() {
+        const s = getState();
+        s.isMuted = !s.isMuted;
+        if (audio) audio.muted = s.isMuted;
+        updateVolumeIcon();
+        saveState(audio);
+    }
+    
+    function updateVolumeIcon() {
+        const s = getState();
+        if (!volumeIcon) return;
+        
+        if (s.isMuted || volumeSlider.value === '0') {
+            volumeIcon.innerHTML = '<path fill="currentColor" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+        } else if (parseInt(volumeSlider.value) < 50) {
+            volumeIcon.innerHTML = '<path fill="currentColor" d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>';
+        } else {
+            volumeIcon.innerHTML = '<path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+        }
+    }
+    
+    // Audio event listeners
+    function ensureAudioListeners() {
+        if (audio?.__listenersBound) return;
+        
+        audio?.addEventListener('ended', nextTrack);
+        audio?.addEventListener('loadedmetadata', () => {
+            if (!isRestoring) {
+                getState().duration = audio.duration;
+                updateProgressBar();
+                saveState(audio);
+            }
+        });
+        
+        (audio as any).__listenersBound = true;
+    }
+    
+    // State restoration
+    function restoreState() {
+        const s = getState();
+        if (!s.currentTrack || !s.currentPlaylist.length || !audio) return;
+        
+        isRestoring = true;
+        updatePlayerVisibility();
+        
+        if (s.volume !== undefined && volumeSlider) {
+            volumeSlider.value = s.volume.toString();
         }
         
-        s.currentPlaylist = album.songs.map((song, index) => ({
+        updateTrackInfo(s.currentTrack);
+        ensureAudioListeners();
+        
+        if (s.currentTrack.file) {
+            audio.src = s.currentTrack.file;
+            audio.volume = (s.volume || 70) / 100;
+            audio.muted = s.isMuted;
+            updatePlayButton();
+            updateVolumeIcon();
+            
+            if (s.currentTime > 0) {
+                audio.currentTime = s.currentTime;
+            }
+            
+            if (s.isPlaying) {
+                audio.play().then(() => startProgress()).catch(err => {
+                    console.log('Auto-play prevented:', err);
+                    s.isPlaying = false;
+                    updatePlayButton();
+                });
+            }
+        }
+        
+        isRestoring = false;
+    }
+    
+    // Global functions
+    function playAlbum(album: any, startIndex = 0) {
+        console.log('[MusicPlayer] playAlbum:', album?.title);
+        if (!album?.songs?.length) return;
+        
+        const s = getState();
+        s.currentPlaylist = album.songs.map((song: any, index: number) => ({
             ...song,
             album: album.title,
             artist: album.artist,
@@ -632,149 +365,109 @@
         }));
         s.currentTrackIndex = startIndex;
         s.isPlaying = true;
-        console.log('[MusicPlayer] Playlist updated, loading track:', s.currentPlaylist[startIndex]?.title);
-        loadTrack(s.currentPlaylist[s.currentTrackIndex]);
+        loadTrack(s.currentPlaylist[startIndex]);
         updatePlayButton();
-        saveState();
+        saveState(audio);
+        window.updateShowBtnState?.();
     }
     
-    // Global function to play single track
-    function playTrack(track) {
+    function playTrack(track: Track) {
         const s = getState();
         s.currentPlaylist = [track];
         s.currentTrackIndex = 0;
         s.isPlaying = true;
         loadTrack(track);
         updatePlayButton();
-        saveState();
+        saveState(audio);
+        window.updateShowBtnState?.();
     }
     
-    // Global function for MusicBox component - play single song from album
-    function playTrackFromBox(albumId, songTitle) {
-       
-        const albums = window.__MUSIC_ALBUMS__;
+    function playTrackFromBox(albumId: string, songTitle: string) {
+        const albums = (window as any).__MUSIC_ALBUMS__;
+        if (!albums) return;
         
-        if (!albums) {
-            console.error('Music albums data not available. Make sure MusicBox component is rendered on the page.');
-            return;
-        }
+        const album = albums.find((a: any) => a.id === albumId);
+        if (!album) return;
         
-        const album = albums.find(a => a.id === albumId);
-        if (!album) {
-            console.error(`Album "${albumId}" not found`);
-            return;
-        }
-
-        const song = album.songs.find(s => s.title === songTitle);
-        if (!song) {
-            console.error(`Song "${songTitle}" not found in album "${albumId}"`);
-            return;
-        }
-
+        const song = album.songs.find((s: any) => s.title === songTitle);
+        if (!song) return;
         
-        const track = {
+        playTrack({
             ...song,
             album: album.title,
             artist: album.artist,
             cover: album.cover
-        };
-
+        });
+    }
+    
+    // Event bindings
+    function bindEvents() {
+        toggleBtn?.addEventListener('click', () => {
+            toggleVisibility();
+        });
         
-        playTrack(track);
-    }
-
-   
-    function processMusicBoxQueue() {
-        if (window.musicBoxClickQueue && window.musicBoxClickQueue.length > 0) {
-            console.log('MusicPlayer: 处理队列中的', window.musicBoxClickQueue.length, '个请求');
-            while (window.musicBoxClickQueue.length > 0) {
-                const { albumId, songTitle } = window.musicBoxClickQueue.shift();
-                window.playTrackFromBox(albumId, songTitle);
-            }
-        }
-    }
-    
-    // Expose to window for external access
-    window.playAlbum = playAlbum;
-    window.playTrack = playTrack;
-    
-    // Event listeners - only bind once
-    if (!isInitialized) {
-        toggleBtn?.addEventListener('click', toggleVisibility);
-        playerShowBtn?.addEventListener('click', toggleVisibility);
         playBtn?.addEventListener('click', togglePlay);
-        prevBtn?.addEventListener('click', () => { previousTrack(); saveState(); });
-        nextBtn?.addEventListener('click', () => { nextTrack(); saveState(); });
+        prevBtn?.addEventListener('click', () => { previousTrack(); saveState(audio); });
+        nextBtn?.addEventListener('click', () => { nextTrack(); saveState(audio); });
         muteBtn?.addEventListener('click', toggleMute);
         
         volumeSlider?.addEventListener('input', (e) => {
-            const newVolume = parseInt(e.target.value);
+            const newVolume = parseInt((e.target as HTMLInputElement).value);
             getState().volume = newVolume;
-            if (audioElement) {
-                audioElement.volume = newVolume / 100;
-            }
+            if (audio) audio.volume = newVolume / 100;
             updateVolumeIcon();
-            saveState();
+            saveState(audio);
         });
         
-        // Click on progress bar to seek
         document.querySelector('.progress-bar')?.addEventListener('click', (e) => {
-            if (!audioElement) return;
-            const rect = e.currentTarget.getBoundingClientRect();
+            if (!audio) return;
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
             const clickPosition = (e.clientX - rect.left) / rect.width;
-            audioElement.currentTime = clickPosition * audioElement.duration;
-            getState().currentTime = audioElement.currentTime;
+            audio.currentTime = clickPosition * audio.duration;
+            getState().currentTime = audio.currentTime;
             updateProgressBar();
-            saveState();
+            saveState(audio);
+        });
+        
+        // Listen for toggle event from button component
+        window.addEventListener('player-toggle-visibility', () => {
+            toggleVisibility();
         });
     }
     
-    // Save state before page unload
-    window.addEventListener('beforeunload', saveState);
-    
-    // Handle View Transitions page swaps - save state before swap
-    document.addEventListener('astro:before-swap', () => {
-        saveState();
-    });
-    
-    // After View Transitions swap - expose global functions (they will use window.__PLAYER_STATE__)
-    document.addEventListener('astro:after-swap', () => {
-        console.log('[MusicPlayer] astro:after-swap - re-exposing global functions');
-        window.playAlbum = playAlbum;
-        window.playTrack = playTrack;
-        window.playTrackFromBox = playTrackFromBox;
-        console.log('[MusicPlayer] Global functions exposed, playAlbum:', typeof window.playAlbum);
-        
-        // 重新同步 UI 状态（展开按钮是新 DOM，需要更新其显示状态）
-        updatePlayerVisibility();
-        updateShowBtnState();
-        
-        // 重新应用当前歌曲的脉冲颜色
-        const s = getState();
-        if (s.currentTrack?.cover) {
-            updatePulseColor(s.currentTrack.cover);
-        }
-    });
-
     // Initialize
-    if (!isInitialized) {
+    function init() {
+        if (isInitialized) return;
+        
         loadState();
-        updatePlayerVisibility(); // 确保 UI 状态与 isVisible 一致
+        updatePlayerVisibility();
         restoreState();
         updateVolumeIcon();
-        updateShowBtnState(); // 初始化展开按钮状态
+        bindEvents();
+        
         isInitialized = true;
-
-        // 暴露全局函数供外部调用
+        
+        // Expose global functions
         window.playAlbum = playAlbum;
         window.playTrack = playTrack;
         window.playTrackFromBox = playTrackFromBox;
-
-        processMusicBoxQueue();
     }
+    
+    // Page lifecycle
+    window.addEventListener('beforeunload', () => saveState(audio));
+    document.addEventListener('astro:before-swap', () => saveState(audio));
+    document.addEventListener('astro:after-swap', () => {
+        window.playAlbum = playAlbum;
+        window.playTrack = playTrack;
+        window.playTrackFromBox = playTrackFromBox;
+    });
+    
+    // Start
+    init();
 </script>
 
 <style>
+    /* Player container styles */
     .floating-player {
         position: fixed;
         top: 100px;
@@ -825,69 +518,7 @@
         padding: 1.2em;
     }
     
-    .player-show-btn {
-        position: fixed;
-        top: 100px;
-        right: 20px;
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
-        background: var(--accent);
-        color: white;
-        border: none;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-        z-index: 999;
-        transition: transform 0.2s ease, background 0.2s ease;
-        --pulse-color: 35, 55, 255;
-    }
-    
-    .player-show-btn:hover {
-        transform: scale(1.05);
-        background: var(--accent-dark);
-    }
-    
-    .player-show-btn.hidden {
-        display: none;
-    }
-    
-    .player-show-btn .album-cover {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        border-radius: 50%;
-        display: none;
-    }
-    
-    .player-show-btn.playing {
-        padding: 0;
-        overflow: hidden;
-    }
-    
-    .player-show-btn.playing .album-cover {
-        display: block;
-    }
-    
-    .player-show-btn.playing .default-icon {
-        display: none;
-    }
-    
-    .player-show-btn.pulse {
-        animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-        0%, 100% {
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-        }
-        50% {
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), 0 0 0 2px rgba(var(--pulse-color), 0.2);
-        }
-    }
-    
+    /* Now playing section */
     .now-playing {
         display: flex;
         align-items: center;
@@ -944,6 +575,7 @@
         text-overflow: ellipsis;
     }
     
+    /* Progress bar */
     .progress-container {
         display: flex;
         align-items: center;
@@ -976,6 +608,7 @@
         width: 0%;
     }
     
+    /* Controls */
     .controls {
         display: flex;
         justify-content: center;
@@ -1013,6 +646,7 @@
         background: var(--accent-dark);
     }
     
+    /* Volume */
     .volume-container {
         display: flex;
         align-items: center;
@@ -1050,6 +684,7 @@
         border: none;
     }
     
+    /* Responsive */
     @media (max-width: 720px) {
         .floating-player {
             left: 0;
@@ -1057,122 +692,19 @@
             top: auto;
             bottom: 0;
             width: 100%;
-            max-width: 100vw;
             border-radius: 16px 16px 0 0;
-            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
-            box-sizing: border-box;
         }
-
+        
         .floating-player.hidden {
             transform: translateY(100%);
         }
-
-        .floating-player.visible {
-            transform: translateY(0);
-        }
-
-        .player-show-btn {
-            right: 15px;
-            top: auto;
-            bottom: 15px;
-            width: 50px;
-            height: 50px;
-        }
-
+        
         .player-content {
             padding: 1em;
-            box-sizing: border-box;
-            width: 100%;
         }
-
+        
         .now-playing {
-            margin-bottom: 0.8em;
             padding-right: 35px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-
-        .album-art {
-            width: 50px;
-            height: 50px;
-        }
-
-        .track-info h3 {
-            font-size: 0.95em;
-        }
-
-        .track-info p {
-            font-size: 0.8em;
-        }
-
-        .progress-container {
-            margin-bottom: 0.6em;
-        }
-
-        .time {
-            font-size: 0.7em;
-            min-width: 32px;
-        }
-
-        .controls {
-            gap: 1.5em;
-            margin-bottom: 0.6em;
-        }
-
-        .control-btn svg {
-            width: 22px;
-            height: 22px;
-        }
-
-        .play-btn {
-            width: 48px;
-            height: 48px;
-        }
-
-        .play-btn svg {
-            width: 28px;
-            height: 28px;
-        }
-
-        .volume-container input[type="range"] {
-            width: 80px;
-        }
-    }
-
-    @media (max-width: 480px) {
-        .floating-player {
-            border-radius: 12px 12px 0 0;
-        }
-
-        .player-content {
-            padding: 0.8em 0.6em;
-        }
-
-        .now-playing {
-            gap: 0.6em;
-            padding-right: 30px;
-        }
-
-        .album-art {
-            width: 42px;
-            height: 42px;
-        }
-
-        .controls {
-            gap: 1em;
-        }
-
-        .play-btn {
-            width: 42px;
-            height: 42px;
-        }
-
-        .volume-container {
-            gap: 0.3em;
-        }
-
-        .volume-container input[type="range"] {
-            width: 60px;
         }
     }
 </style>

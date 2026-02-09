@@ -1,0 +1,192 @@
+---
+// Player Show Button Component
+// Displays the floating button when player is collapsed
+---
+
+<button id="player-show-btn" class="player-show-btn hidden" title="Show Player" transition:persist="player-show-btn">
+    <svg class="default-icon" viewBox="0 0 24 24" width="24" height="24">
+        <path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+    </svg>
+    <img class="album-cover" src="" alt="Album Cover" style="display: none;">
+</button>
+
+<script>
+    import { getState, type PlayerState } from '../utils/playerState';
+    import { updatePulseColor } from '../utils/coverColor';
+    
+    const BUTTON_INITIALIZED = Symbol.for('playerShowButtonInitialized');
+    
+    if (window[BUTTON_INITIALIZED]) {
+        // Re-initialize for new DOM after page transition
+        initButton();
+    }
+    
+    window[BUTTON_INITIALIZED] = true;
+    
+    let playerShowBtn: HTMLElement | null = null;
+    let playerShowBtnCover: HTMLImageElement | null = null;
+    let playerShowBtnIcon: SVGElement | null = null;
+    
+    function getElements() {
+        playerShowBtn = document.getElementById('player-show-btn');
+        playerShowBtnCover = playerShowBtn?.querySelector('.album-cover') as HTMLImageElement;
+        playerShowBtnIcon = playerShowBtn?.querySelector('.default-icon') as SVGElement;
+    }
+    
+    export function updateShowBtnState() {
+        const s = getState();
+        const hasTrack = s.currentTrack && s.currentTrack.cover;
+        
+        if (!playerShowBtn) return;
+        
+        if (hasTrack) {
+            playerShowBtn.classList.add('playing');
+            if (playerShowBtnCover) {
+                playerShowBtnCover.src = s.currentTrack!.cover!;
+                playerShowBtnCover.style.display = 'block';
+            }
+            if (playerShowBtnIcon) {
+                playerShowBtnIcon.style.display = 'none';
+            }
+            
+            // Pulse animation only when playing
+            if (s.isPlaying) {
+                playerShowBtn.classList.add('pulse');
+            } else {
+                playerShowBtn.classList.remove('pulse');
+            }
+            
+            // Update pulse color
+            updatePulseColor(s.currentTrack!.cover, playerShowBtn);
+        } else {
+            playerShowBtn.classList.remove('playing');
+            playerShowBtn.classList.remove('pulse');
+            if (playerShowBtnCover) {
+                playerShowBtnCover.style.display = 'none';
+            }
+            if (playerShowBtnIcon) {
+                playerShowBtnIcon.style.display = 'block';
+            }
+            updatePulseColor(null, playerShowBtn);
+        }
+    }
+    
+    export function toggleVisibility() {
+        const s = getState();
+        s.isVisible = !s.isVisible;
+        updatePlayerVisibility();
+    }
+    
+    export function updatePlayerVisibility() {
+        const s = getState();
+        if (s.isVisible) {
+            playerShowBtn?.classList.add('hidden');
+        } else {
+            playerShowBtn?.classList.remove('hidden');
+        }
+    }
+    
+    function initButton() {
+        getElements();
+        
+        // Bind click event
+        playerShowBtn?.addEventListener('click', () => {
+            toggleVisibility();
+            // Notify parent component
+            window.dispatchEvent(new CustomEvent('player-toggle-visibility'));
+        });
+        
+        // Initial state update
+        updateShowBtnState();
+        updatePlayerVisibility();
+    }
+    
+    // Initialize on first load
+    initButton();
+    
+    // Re-initialize after view transitions
+    document.addEventListener('astro:after-swap', () => {
+        getElements();
+        updateShowBtnState();
+        updatePlayerVisibility();
+    });
+    
+    // Expose functions globally
+    window.updateShowBtnState = updateShowBtnState;
+    window.updatePlayerVisibility = updatePlayerVisibility;
+</script>
+
+<style>
+    .player-show-btn {
+        position: fixed;
+        top: 100px;
+        right: 20px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: white;
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        z-index: 999;
+        transition: transform 0.2s ease, background 0.2s ease;
+        --pulse-color: 35, 55, 255;
+    }
+    
+    .player-show-btn:hover {
+        transform: scale(1.05);
+        background: var(--accent-dark);
+    }
+    
+    .player-show-btn.hidden {
+        display: none;
+    }
+    
+    .player-show-btn .album-cover {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 50%;
+        display: none;
+    }
+    
+    .player-show-btn.playing {
+        padding: 0;
+        overflow: hidden;
+    }
+    
+    .player-show-btn.playing .album-cover {
+        display: block;
+    }
+    
+    .player-show-btn.playing .default-icon {
+        display: none;
+    }
+    
+    .player-show-btn.pulse {
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% {
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+        }
+        50% {
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18), 0 0 0 3px rgba(var(--pulse-color), 0.25);
+        }
+    }
+    
+    @media (max-width: 720px) {
+        .player-show-btn {
+            right: 15px;
+            top: auto;
+            bottom: 15px;
+            width: 50px;
+            height: 50px;
+        }
+    }
+</style>
