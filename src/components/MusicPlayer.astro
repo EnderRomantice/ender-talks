@@ -67,7 +67,7 @@
     </div>
 </div>
 
-<button id="player-show-btn" class="player-show-btn hidden" title="Show Player">
+<button id="player-show-btn" class="player-show-btn hidden" title="Show Player" transition:persist="player-show-btn">
     <svg viewBox="0 0 24 24" width="24" height="24">
         <path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
     </svg>
@@ -561,11 +561,15 @@
         window.playTrack = playTrack;
         window.playTrackFromBox = playTrackFromBox;
         console.log('[MusicPlayer] Global functions exposed, playAlbum:', typeof window.playAlbum);
+        
+        // 重新同步 UI 状态（展开按钮是新 DOM，需要更新其显示状态）
+        updatePlayerVisibility();
     });
 
     // Initialize
     if (!isInitialized) {
         loadState();
+        updatePlayerVisibility(); // 确保 UI 状态与 isVisible 一致
         restoreState();
         updateVolumeIcon();
         isInitialized = true;
