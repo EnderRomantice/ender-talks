@@ -1,0 +1,193 @@
+---
+import { albums } from "../data/albums";
+
+interface Props {
+  album: string;  // 专辑ID
+  song: string;   // 歌曲标题
+}
+
+const { album: albumId, song: songTitle } = Astro.props;
+
+// 查找对应的专辑和歌曲
+const album = albums.find(a => a.id === albumId);
+const song = album?.songs.find(s => s.title === songTitle);
+
+if (!album || !song) {
+  console.warn(`MusicBox: 未找到专辑 "${albumId}" 或歌曲 "${songTitle}"`);
+}
+
+// 将 albums 数据序列化为 JSON，供客户端使用
+const albumsDataJson = JSON.stringify(albums);
+---
+
+{album && song && (
+  <div 
+    class="music-box" 
+    data-album-id={albumId}
+    data-song-title={songTitle}
+    role="button"
+    tabindex="0"
+  >
+    <div class="music-box-cover">
+      <img src={album.cover} alt={album.title} />
+      <div class="play-overlay">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+          <path fill="currentColor" d="M8 5v14l11-7z"/>
+        </svg>
+      </div>
+    </div>
+    <div class="music-box-info">
+      <div class="music-box-title">{song.title}</div>
+      <div class="music-box-album">{album.title}</div>
+    </div>
+  </div>
+)}
+
+<script define:vars={{ albumsData: albumsDataJson }}>
+  // 解析注入的 albums 数据
+  const albums = JSON.parse(albumsData);
+  
+  // 将 albums 数据挂载到全局，供 MusicPlayer 使用
+  window.__MUSIC_ALBUMS__ = albums;
+  
+  // 音乐盒子点击处理队列
+  window.musicBoxClickQueue = window.musicBoxClickQueue || [];
+  
+  // 播放函数
+  function handleMusicBoxClick(albumId, songTitle) {
+    if (window.playTrackFromBox && albumId && songTitle) {
+      window.playTrackFromBox(albumId, songTitle);
+    } else {
+      // 播放器未就绪，加入队列等待
+      window.musicBoxClickQueue.push({ albumId, songTitle });
+      console.log('MusicBox: 播放器未就绪，已加入队列', { albumId, songTitle });
+    }
+  }
+  
+  // 初始化单个音乐盒子
+  function initMusicBox(box) {
+    if (box.hasAttribute('data-musicbox-initialized')) return;
+    box.setAttribute('data-musicbox-initialized', 'true');
+    
+    const albumId = box.getAttribute('data-album-id');
+    const songTitle = box.getAttribute('data-song-title');
+    
+    box.addEventListener('click', () => {
+      handleMusicBoxClick(albumId, songTitle);
+    });
+    
+    // 键盘支持
+    box.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleMusicBoxClick(albumId, songTitle);
+      }
+    });
+  }
+  
+  // 初始化所有音乐盒子
+  function initAllMusicBoxes() {
+    document.querySelectorAll('.music-box:not([data-musicbox-initialized])').forEach(initMusicBox);
+  }
+  
+  // 页面加载完成后初始化
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAllMusicBoxes);
+  } else {
+    initAllMusicBoxes();
+  }
+  
+  // View Transitions 后重新初始化
+  document.addEventListener('astro:after-swap', initAllMusicBoxes);
+  
+  // 暴露初始化函数供 MusicPlayer 调用
+  window.initMusicBoxes = initAllMusicBoxes;
+</script>
+
+<style>
+  .music-box {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+    padding: 0.8em 1em;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(var(--gray), 15%);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    margin: 1em 0;
+    max-width: 400px;
+  }
+  
+  .music-box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(var(--gray), 25%);
+  }
+  
+  .music-box-cover {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  
+  .music-box-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .play-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  
+  .play-overlay svg {
+    color: white;
+  }
+  
+  .music-box:hover .play-overlay {
+    opacity: 1;
+  }
+  
+  .music-box-info {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .music-box-title {
+    font-weight: 600;
+    color: rgb(var(--black));
+    margin-bottom: 0.2em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  .music-box-album {
+    font-size: 0.85em;
+    color: rgb(var(--gray));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  
+  /* 适配暗色主题（如果将来支持） */
+  @media (prefers-color-scheme: dark) {
+    .music-box {
+      background: rgb(var(--gray-dark));
+    }
+    
+    .music-box-title {
+      color: rgb(var(--gray-light));
+    }
+  }
+</style>

@@ -442,6 +442,51 @@
         saveState();
     }
     
+    // Global function for MusicBox component - play single song from album
+    window.playTrackFromBox = function(albumId, songTitle) {
+        // 使用从 MusicBox 注入的全局 albums 数据
+        const albums = window.__MUSIC_ALBUMS__;
+        
+        if (!albums) {
+            console.error('Music albums data not available. Make sure MusicBox component is rendered on the page.');
+            return;
+        }
+        
+        const album = albums.find(a => a.id === albumId);
+        if (!album) {
+            console.error(`Album "${albumId}" not found`);
+            return;
+        }
+
+        const song = album.songs.find(s => s.title === songTitle);
+        if (!song) {
+            console.error(`Song "${songTitle}" not found in album "${albumId}"`);
+            return;
+        }
+
+        // 创建完整的 track 对象
+        const track = {
+            ...song,
+            album: album.title,
+            artist: album.artist,
+            cover: album.cover
+        };
+
+        // 播放单曲
+        playTrack(track);
+    };
+
+    // 处理 MusicBox 队列中的点击请求
+    function processMusicBoxQueue() {
+        if (window.musicBoxClickQueue && window.musicBoxClickQueue.length > 0) {
+            console.log('MusicPlayer: 处理队列中的', window.musicBoxClickQueue.length, '个请求');
+            while (window.musicBoxClickQueue.length > 0) {
+                const { albumId, songTitle } = window.musicBoxClickQueue.shift();
+                window.playTrackFromBox(albumId, songTitle);
+            }
+        }
+    }
+    
     // Expose to window for external access
     window.playAlbum = playAlbum;
     window.playTrack = playTrack;
@@ -490,6 +535,7 @@
         // 重新绑定全局函数供新页面使用
         window.playAlbum = window.musicPlayerState?.playAlbum || playAlbum;
         window.playTrack = window.musicPlayerState?.playTrack || playTrack;
+        window.playTrackFromBox = window.musicPlayerState?.playTrackFromBox || window.playTrackFromBox;
     });
     
     // Initialize
@@ -502,8 +548,12 @@
         // 保存全局函数引用到 window，供 View Transitions 后恢复
         window.musicPlayerState = {
             playAlbum: playAlbum,
-            playTrack: playTrack
+            playTrack: playTrack,
+            playTrackFromBox: window.playTrackFromBox
         };
+        
+        // 处理队列中的 MusicBox 点击请求
+        processMusicBoxQueue();
     }
 </script>
 

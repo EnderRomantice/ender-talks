@@ -1,0 +1,65 @@
+---
+title: '用View Transitions API解决MPA状态更新问题'
+description: '一点试错经验'
+pubDate: '2 9 2026'
+language: 'Chinese'
+---
+
+import MusicBox from '../../components/MusicBox.astro';
+
+之前在blog的技术选型中，我选择了Astro这个现代轻快的tech stack.
+
+一开始一直蛮顺利，无论是响应速度还是开发体验都相当不错，我第一个基于React的blog首屏要4-5s, 这个很少超过2s，大多数时候1s左右就能首屏。
+
+我在一天时间里完成了核心功能，目前为止没有任何问题。
+
+直到最近我的一个朋友在她的博客中加入了音乐播放功能，并且实现了一个简易的播放控件悬浮窗，我感到有些羞愧：因为我本身也是非常喜欢音乐的，一直想要做这个功能但是出于一些完美主义的想法没有动手。而她一个初学者轻松去做了自己想做的事情，还做得很好。
+
+于是我开始着手实现，封装了一个“文件即专辑”的效果，识别public/music下的文件夹作为专辑，内部的cover.jpg作为封面，所有音频文件就渲染到播放列表。
+
+当时我还为自己的小巧思感到窃喜，然后实际体验了一下我直接傻掉了：为什么切换页面播放器悬浮窗会消失掉，歌也没了！
+
+我瞬间反应过来因为这是MPA，多页面架构，每次切换页面所有资源会被释放，html文档流会重新生成——恰恰包括了播放进度和歌曲本身。
+
+我有一小会后悔过用Astro，但我想到SPA那个不太友好的加载速度还是回过神来思考解决方案。
+
+我最近在用Kimi+opencode这个AI coding组合，我问了一下Kimi这个问题是不是没有很完美的解决方案，Kimi说: 是的，只能用iflame或者转SPA架构。
+
+于是我退而求其次选择用浏览器缓存保存播放歌曲和进度等信息，匆匆push就暂时没有去管。
+
+第二天清晨我在外散步，打开b站刷到了brandon的视频。由于没有字幕我没太听清具体内容，只能看见画面是一个静态网站。但我捕获到了一句话：这样就实现了类似SPA的效果。
+
+这个发现让我立刻倒转回去认真的聆听全视频内容，它提到了解决MPA状态问题的一个关键点：View Transitions API。
+
+这是一个很新的API，新到和CSS的条件语句一样。在这个vibe coding时代，大家连上层的框架都已经不愿意再去花费精力，更不要说这些底层的浏览器原生API（我也是其中的一员）。
+
+这个发现令我十分的振奋，我立刻回到家打开电脑开始实现这个效果，恰好Astro居然已经对这个API做了封装，我很快实现了改造。
+
+```tsx
+---
+import { ViewTransitions } from 'astro:transitions';
+import MusicPlayer from '../components/MusicPlayer.astro';
+---
+
+<html>
+  <head>
+    <ViewTransitions />
+  </head>
+  <body>
+    <slot />
+    
+    <!-- transition:persist 让播放器在页面切换时不被销毁 -->
+    <div transition:persist="music-player">
+      <MusicPlayer />
+    </div>
+  </body>
+</html>
+```
+
+
+
+现在Ender Talk切换页面不会再断掉播放器了，也不会有卡顿的感觉，非常完美！
+
+试试我推荐的歌来看看效果吧：
+
+<MusicBox album="once-upon-a-cloud-in-beijing" song="[外] 深埋地下八万里 (小样)" />
