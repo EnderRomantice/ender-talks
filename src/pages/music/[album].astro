@@ -7,103 +7,130 @@ import { albums } from "../../data/albums";
 import "../../styles/global.css";
 
 export function getStaticPaths() {
-  return albums.map(album => ({
-    params: { album: album.id },
-    props: { album },
-  }));
+    return albums.map((album) => ({
+        params: { album: album.id },
+        props: { album },
+    }));
 }
 
 const { album } = Astro.props;
 
 const head = {
-  title: `${album.title} - Ender Talks Music`,
-  description: `${album.title} by ${album.artist}`
+    title: `${album.title} - Ender Talks Music`,
+    description: `${album.title} by ${album.artist}`,
 };
 ---
 
 <html>
     <BaseHead title={head.title} description={head.description} />
     <Header />
-    
+
     <main class="album-detail-container">
         <div class="album-header">
             <div class="album-cover-large">
                 <img src={album.cover} alt={album.title} />
             </div>
-            
+
             <div class="album-meta">
                 <h1>{album.title}</h1>
-       
-                
-                {album.description && (
-                    <div class="album-description">
-                        <p>{album.description}</p>
-                    </div>
-                )}
-                
+
+                {
+                    album.description && (
+                        <div class="album-description">
+                            <p>{album.description}</p>
+                        </div>
+                    )
+                }
+
                 <div class="album-actions">
                     <button class="play-all-btn" id="play-all-btn">
                         <svg viewBox="0 0 24 24" width="24" height="24">
-                            <path fill="currentColor" d="M8 5v14l11-7z"/>
+                            <path fill="currentColor" d="M8 5v14l11-7z"></path>
                         </svg>
                         Play All
                     </button>
-                    
-                    <a href="/music" class="back-link">
-                        Back to Albums
-                    </a>
+
+                    <a href="/music" class="back-link"> Back to Albums </a>
                 </div>
             </div>
         </div>
-        
+
         <section class="playlist-section">
             <h2>Playlist</h2>
-            
+
             <div class="song-list">
                 <div class="song-list-header">
                     <span class="song-number"> </span>
                     <span class="song-title-header">Title</span>
                 </div>
-                
-                {album.songs.map((song, index) => (
-                    <div class="song-item" data-index={index} data-title={song.title}>
-                        <span class="song-number">
-                            <span class="number">{index + 1}</span>
-                            <button class="play-song-btn" data-index={index}>
-                                <svg viewBox="0 0 24 24" width="20" height="20">
-                                    <path fill="currentColor" d="M8 5v14l11-7z"/>
-                                </svg>
-                            </button>
-                        </span>
-                        <span class="song-title">
-                            {song.title}
-                            {song.isRecommended && (
-                                <span class="recommended-star" title="Recommended">
-                                    <svg viewBox="0 0 24 24" width="16" height="16">
-                                        <path fill="currentColor" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+
+                {
+                    album.songs.map((song, index) => (
+                        <div
+                            class="song-item"
+                            data-index={index}
+                            data-title={song.title}
+                        >
+                            <span class="song-number">
+                                <span class="number">{index + 1}</span>
+                                <button
+                                    class="play-song-btn"
+                                    data-index={index}
+                                >
+                                    <svg
+                                        viewBox="0 0 24 24"
+                                        width="20"
+                                        height="20"
+                                    >
+                                        <path
+                                            fill="currentColor"
+                                            d="M8 5v14l11-7z"
+                                        />
                                     </svg>
-                                </span>
-                            )}
-                        </span>
-                    </div>
-                ))}
+                                </button>
+                            </span>
+                            <span class="song-title">
+                                {song.title}
+                                {song.isRecommended && (
+                                    <span
+                                        class="recommended-star"
+                                        title="Recommended"
+                                    >
+                                        <svg
+                                            viewBox="0 0 24 24"
+                                            width="16"
+                                            height="16"
+                                        >
+                                            <path
+                                                fill="currentColor"
+                                                d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
+                                            />
+                                        </svg>
+                                    </span>
+                                )}
+                            </span>
+                        </div>
+                    ))
+                }
             </div>
         </section>
     </main>
-    
+
     <Footer />
-    
+
     <script define:vars={{ album: JSON.stringify(album) }}>
         const albumData = JSON.parse(album);
-        
-        document.getElementById('play-all-btn')?.addEventListener('click', () => {
-            if (window.playAlbum) {
-                window.playAlbum(albumData, 0);
-            }
-        });
-        
-        document.querySelectorAll('.play-song-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+
+        document
+            .getElementById("play-all-btn")
+            ?.addEventListener("click", () => {
+                if (window.playAlbum) {
+                    window.playAlbum(albumData, 0);
+                }
+            });
+
+        document.querySelectorAll(".play-song-btn").forEach((btn) => {
+            btn.addEventListener("click", (e) => {
                 e.stopPropagation();
                 const index = parseInt(btn.dataset.index);
                 if (window.playAlbum) {
@@ -111,9 +138,9 @@ const head = {
                 }
             });
         });
-        
-        document.querySelectorAll('.song-item').forEach(item => {
-            item.addEventListener('click', () => {
+
+        document.querySelectorAll(".song-item").forEach((item) => {
+            item.addEventListener("click", () => {
                 const index = parseInt(item.dataset.index);
                 if (window.playAlbum) {
                     window.playAlbum(albumData, index);
@@ -130,14 +157,14 @@ const head = {
         margin: 0 auto;
         padding: 2em 1em;
     }
-    
+
     .album-header {
         display: flex;
         gap: 3em;
         margin-bottom: 3em;
         align-items: flex-start;
     }
-    
+
     .album-cover-large {
         flex-shrink: 0;
         width: 280px;
@@ -146,21 +173,21 @@ const head = {
         overflow: hidden;
         box-shadow: 0 4px 12px rgba(var(--gray), 20%);
     }
-    
+
     .album-cover-large img {
         width: 100%;
         height: 100%;
         object-fit: cover;
         border-radius: 0;
     }
-    
+
     .album-meta {
         flex: 1;
         display: flex;
         flex-direction: column;
         gap: 0.5em;
     }
-    
+
     .album-type {
         font-size: 0.85em;
         text-transform: uppercase;
@@ -168,33 +195,35 @@ const head = {
         color: var(--accent);
         font-weight: 600;
     }
-    
+
     .album-meta h1 {
         font-size: 3em;
         margin: 0;
         line-height: 1.1;
     }
-    
+
     .album-artist-large {
         font-size: 1.3em;
         color: rgb(var(--gray));
         margin: 0;
     }
-    
+
     .album-stats {
         color: rgb(var(--gray));
         font-size: 0.9em;
         margin: 0.5em 0 1em 0;
     }
-    
+
     .album-description {
         margin: 0.5em 0 1em 0;
         padding: 1em;
         background: rgba(var(--gray-light), 0.5);
         border-radius: 8px;
-        border-left: 3px solid var(--accent);
+        font-size: 0.875rem;
+        color: rgb(var(--gray));
+        font-style: italic;
     }
-    
+
     .album-description p {
         margin: 0;
         color: rgb(var(--gray-dark));
@@ -202,13 +231,13 @@ const head = {
         line-height: 1.6;
         white-space: pre-wrap;
     }
-    
+
     .album-actions {
         display: flex;
         gap: 1em;
         align-items: center;
     }
-    
+
     .play-all-btn {
         display: flex;
         align-items: center;
@@ -221,14 +250,16 @@ const head = {
         font-size: 1em;
         font-family: inherit;
         cursor: pointer;
-        transition: background 0.2s ease, transform 0.2s ease;
+        transition:
+            background 0.2s ease,
+            transform 0.2s ease;
     }
-    
+
     .play-all-btn:hover {
         background: var(--accent-dark);
         transform: scale(1.02);
     }
-    
+
     .back-link {
         display: flex;
         align-items: center;
@@ -238,27 +269,27 @@ const head = {
         font-size: 0.95em;
         transition: color 0.2s ease;
     }
-    
+
     .back-link:hover {
         color: var(--accent);
     }
-    
+
     .playlist-section {
         margin-top: 2em;
     }
-    
+
     .playlist-section h2 {
         margin-bottom: 1em;
         font-size: 1.5em;
     }
-    
+
     .song-list {
         background: white;
         border-radius: 12px;
         overflow: hidden;
         box-shadow: 0 2px 8px rgba(var(--gray), 15%);
     }
-    
+
     .song-list-header {
         display: grid;
         grid-template-columns: 60px 1fr;
@@ -270,7 +301,7 @@ const head = {
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
-    
+
     .song-item {
         display: grid;
         grid-template-columns: 60px 1fr;
@@ -280,23 +311,23 @@ const head = {
         cursor: pointer;
         transition: background 0.2s ease;
     }
-    
+
     .song-item:last-child {
         border-bottom: none;
     }
-    
+
     .song-item:hover {
         background: rgba(var(--gray-light), 0.5);
     }
-    
+
     .song-item:hover .number {
         display: none;
     }
-    
+
     .song-item:hover .play-song-btn {
         display: flex;
     }
-    
+
     .song-number {
         display: flex;
         align-items: center;
@@ -304,7 +335,7 @@ const head = {
         color: rgb(var(--gray));
         font-size: 0.95em;
     }
-    
+
     .play-song-btn {
         display: none;
         background: var(--accent);
@@ -318,11 +349,11 @@ const head = {
         cursor: pointer;
         transition: transform 0.2s ease;
     }
-    
+
     .play-song-btn:hover {
         transform: scale(1.1);
     }
-    
+
     .song-title {
         font-weight: 500;
         color: rgb(var(--black));
@@ -334,16 +365,17 @@ const head = {
         align-items: center;
         gap: 0.5em;
     }
-    
+
     .recommended-star {
         color: #ffc107;
         flex-shrink: 0;
         display: inline-flex;
         align-items: center;
     }
-    
+
     @media (max-width: 720px) {
-        html, body {
+        html,
+        body {
             overflow-x: hidden;
         }
 
