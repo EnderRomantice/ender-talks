@@ -176,14 +176,25 @@ class PlayerController {
     // Track loading
     loadTrack(track: Track) {
         if (!track || !this.audio) return;
-        
+
         const s = getState();
         s.currentTrack = track;
-        
+
         this.audio.pause();
         this.audio.src = track.file;
         this.audio.volume = (s.volume || 70) / 100;
         this.audio.muted = s.isMuted;
+
+        // Reset current time for new track
+        s.currentTime = 0;
+        s.duration = 0;
+        
+        // Emit progress event to reset UI immediately
+        this.emit('progress', {
+            currentTime: 0,
+            duration: 0,
+            percentage: 0
+        });
         
         if (s.isPlaying) {
             this.audio.play().catch(err => {
