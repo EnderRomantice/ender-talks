@@ -16,12 +16,20 @@ export interface Album {
   description: string;
   recommended: string[];
   songs: Song[];
+  lock?: {
+    key: string;
+    hint?: string;
+  };
 }
 
 interface ReadmeData {
   artist: string;
   description: string;
   recommended: string[];
+  lock?: {
+    key: string;
+    hint?: string;
+  };
 }
 
 // Use public directory for music files (copied at build time)
@@ -50,35 +58,88 @@ function parseYamlFrontmatter(content: string): { frontmatter: Record<string, an
     const yamlContent = match[1];
     body = match[2].trim();
     
-    // Parse simple YAML key-value pairs
+    // Parse YAML with support for nested objects
     const lines = yamlContent.split('\n');
-    for (const line of lines) {
+    let currentObjectKey: string | null = null;
+    let currentObject: Record<string, any> = {};
+    let i = 0;
+    
+    while (i < lines.length) {
+      const line = lines[i];
       const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
       
-      // Check for array format: key: [item1, item2]
-      const arrayMatch = trimmed.match(/^(\w+):\s*\[(.*)\]$/);
-      if (arrayMatch) {
-        const key = arrayMatch[1];
-        const items = arrayMatch[2].split(',').map(item => item.trim().replace(/["']/g, ''));
-        frontmatter[key] = items.filter(item => item);
+      if (!trimmed || trimmed.startsWith('#')) {
+        i++;
         continue;
       }
       
-      // Check for simple key-value
-      const kvMatch = trimmed.match(/^(\w+):\s*(.+)$/);
-      if (kvMatch) {
-        const key = kvMatch[1];
-        let value: any = kvMatch[2].trim();
-        
-        // Remove quotes if present
-        if ((value.startsWith('"') && value.endsWith('"')) || 
-            (value.startsWith("'") && value.endsWith("'"))) {
-          value = value.slice(1, -1);
+      // Check if this is a top-level key (not indented)
+      if (!line.startsWith(' ') && !line.startsWith('\t')) {
+        // If we were building a nested object, save it first
+        if (currentObjectKey) {
+          frontmatter[currentObjectKey] = currentObject;
+          currentObjectKey = null;
+          currentObject = {};
         }
         
-        frontmatter[key] = value;
+        // Check for array format: key: [item1, item2]
+        const arrayMatch = trimmed.match(/^(\w+):\s*\[(.*)\]$/);
+        if (arrayMatch) {
+          const key = arrayMatch[1];
+          const items = arrayMatch[2].split(',').map(item => item.trim().replace(/["']/g, ''));
+          frontmatter[key] = items.filter(item => item);
+          i++;
+          continue;
+        }
+        
+        // Check for object start: key: (with no value, followed by nested properties)
+        const objectStartMatch = trimmed.match(/^(\w+):\s*$/);
+        if (objectStartMatch) {
+          currentObjectKey = objectStartMatch[1];
+          currentObject = {};
+          i++;
+          continue;
+        }
+        
+        // Check for simple key-value: key: value
+        const kvMatch = trimmed.match(/^(\w+):\s*(.+)$/);
+        if (kvMatch) {
+          const key = kvMatch[1];
+          let value: any = kvMatch[2].trim();
+          
+          // Remove quotes if present
+          if ((value.startsWith('"') && value.endsWith('"')) || 
+              (value.startsWith("'") && value.endsWith("'"))) {
+            value = value.slice(1, -1);
+          }
+          
+          frontmatter[key] = value;
+        }
+      } else {
+        // This is an indented line (nested property)
+        if (currentObjectKey) {
+          const nestedMatch = trimmed.match(/^(\w+):\s*(.+)$/);
+          if (nestedMatch) {
+            const nestedKey = nestedMatch[1];
+            let nestedValue: any = nestedMatch[2].trim();
+            
+            // Remove quotes if present
+            if ((nestedValue.startsWith('"') && nestedValue.endsWith('"')) || 
+                (nestedValue.startsWith("'") && nestedValue.endsWith("'"))) {
+              nestedValue = nestedValue.slice(1, -1);
+            }
+            
+            currentObject[nestedKey] = nestedValue;
+          }
+        }
       }
+      
+      i++;
+    }
+    
+    // Don't forget to save the last object
+    if (currentObjectKey && Object.keys(currentObject).length > 0) {
+      frontmatter[currentObjectKey] = currentObject;
     }
   }
   
@@ -123,10 +184,24 @@ function readReadme(albumDir: string, albumFiles: string[]): ReadmeData {
   
   const { frontmatter, body } = parseYamlFrontmatter(content);
   
+  // Parse lock field if present
+  let lock: { key: string; hint?: string } | undefined;
+  if (frontmatter.lock) {
+    if (typeof frontmatter.lock === 'string') {
+      lock = { key: frontmatter.lock };
+    } else if (typeof frontmatter.lock === 'object') {
+      lock = {
+        key: frontmatter.lock.key || '',
+        hint: frontmatter.lock.hint
+      };
+    }
+  }
+  
   return {
     artist: frontmatter.artist || '',
     description: body || '',
-    recommended: frontmatter.recommended || []
+    recommended: frontmatter.recommended || [],
+    lock
   };
 }
 
@@ -203,7 +278,8 @@ function scanMusicDirectory(): Album[] {
             cover: coverFile,
             description: readmeData.description,
             recommended: readmeData.recommended,
-            songs
+            songs,
+            lock: readmeData.lock
           });
         }
       }

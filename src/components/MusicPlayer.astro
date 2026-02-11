@@ -319,21 +319,26 @@ import PlayerShowButton from './PlayerShowButton.astro';
     }
     
     // Initialize
-    function init() {
+    function init(isViewTransition = false) {
         getElements();
         bindEvents();
         subscribe();
+        
+        // Only load saved state on first load, not on view transitions
+        // because the audio element is persisted and maintains its own state
+        if (!isViewTransition) {
+            loadState();
+        }
+        
         restore();
     }
     
     // First load
-    init();
+    init(false);
     
-    // View transition
+    // View transition - don't reload state from storage
     document.addEventListener('astro:after-swap', () => {
-        getElements();
-        bindEvents();
-        restore();
+        init(true);
     });
     
     // Save state on unload

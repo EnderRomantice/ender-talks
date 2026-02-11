@@ -15,13 +15,42 @@ const head = {
     title: `${album.title} - Ender Talks Music`,
     description: `${album.title} by ${album.artist}`,
 };
+
+const isLocked = !!album.lock;
+const lockKey = album.lock?.key || '';
+const lockHint = album.lock?.hint || '';
+const albumId = album.id;
 ---
 
 <BaseLayout title={head.title} description={head.description}>
-    <main class="album-detail-container">
+    <main class="album-detail-container" data-album-id={albumId} data-lock-key={lockKey} data-lock-hint={lockHint} data-is-locked={isLocked}>
+        {isLocked && (
+            <div id="album-lock-overlay" class="album-lock-overlay">
+                <div class="album-lock-content">
+                    <svg class="album-lock-icon" viewBox="0 0 24 24" width="64" height="64">
+                        <path fill="currentColor" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                    </svg>
+                    <h2 class="album-lock-title">此专辑已锁定</h2>
+                    <p class="album-lock-hint">{lockHint || '需要密钥才能访问'}</p>
+                    <input 
+                        type="password" 
+                        id="album-unlock-input" 
+                        class="album-unlock-input" 
+                        placeholder="请输入密钥..."
+                        autocomplete="off"
+                    />
+                    <div class="album-lock-buttons">
+                        <a href="/music" class="album-lock-btn album-lock-btn-back">返回专辑列表</a>
+                        <button id="album-unlock-btn" class="album-lock-btn album-lock-btn-unlock">解锁</button>
+                    </div>
+                    <p id="album-unlock-error" class="album-unlock-error"></p>
+                </div>
+            </div>
+        )}
+        
         <div class="album-header">
             <div class="album-cover-large">
-                <img src={album.cover} alt={album.title} />
+                <img src={album.cover} alt={album.title} class={isLocked ? 'blurred' : ''} />
             </div>
 
             <div class="album-meta">
@@ -125,7 +154,56 @@ const head = {
             }
         }
 
+        // 检查专辑是否被锁定
+        // 专辑锁定解锁逻辑
+        const UNLOCKED_ALBUMS_KEY = 'unlockedAlbums';
+        
+        function getUnlockedAlbums() {
+            try {
+                const data = localStorage.getItem(UNLOCKED_ALBUMS_KEY);
+                return data ? JSON.parse(data) : [];
+            } catch {
+                return [];
+            }
+        }
+        
+        function saveUnlockedAlbum(albumId) {
+            const unlocked = getUnlockedAlbums();
+            if (!unlocked.includes(albumId)) {
+                unlocked.push(albumId);
+                localStorage.setItem(UNLOCKED_ALBUMS_KEY, JSON.stringify(unlocked));
+            }
+        }
+        
+        function isAlbumUnlocked(albumId) {
+            return getUnlockedAlbums().includes(albumId);
+        }
+        
+        function isAlbumLocked() {
+            const container = document.querySelector('.album-detail-container');
+            if (!container) return false;
+            
+            const isLocked = container.dataset.isLocked === 'true';
+            const albumId = container.dataset.albumId;
+            
+            if (!isLocked || !albumId) return false;
+            
+            // 检查是否已解锁
+            return !isAlbumUnlocked(albumId);
+        }
+
         function handlePlayAll() {
+            if (isAlbumLocked()) {
+                // 显示解锁弹窗
+                const lockOverlay = document.getElementById('album-lock-overlay');
+                const unlockInput = document.getElementById('album-unlock-input');
+                if (lockOverlay) {
+                    lockOverlay.classList.remove('hidden');
+                    unlockInput?.focus();
+                }
+                return;
+            }
+            
             const album = getAlbumFromDOM();
             console.log('[Album Page] Play All clicked, album:', album?.title);
             if (window.playAlbum && album) {
@@ -136,6 +214,17 @@ const head = {
         }
 
         function playSongAtIndex(index) {
+            if (isAlbumLocked()) {
+                // 显示解锁弹窗
+                const lockOverlay = document.getElementById('album-lock-overlay');
+                const unlockInput = document.getElementById('album-unlock-input');
+                if (lockOverlay) {
+                    lockOverlay.classList.remove('hidden');
+                    unlockInput?.focus();
+                }
+                return;
+            }
+            
             const album = getAlbumFromDOM();
             console.log('[Album Page] Play song at index:', index, 'song:', album?.songs?.[index]?.title);
             if (window.playAlbum && album) {
@@ -182,6 +271,92 @@ const head = {
         }
         
         console.log('[Album Page] Script initialized, album:', getAlbumFromDOM()?.title);
+        
+        // 检查专辑锁定状态
+        function initAlbumLock() {
+            const container = document.querySelector('.album-detail-container');
+            if (!container) return;
+            
+            const isLocked = container.dataset.isLocked === 'true';
+            const albumId = container.dataset.albumId;
+            
+            if (!isLocked || !albumId) return;
+            
+            const lockOverlay = document.getElementById('album-lock-overlay');
+            const coverImg = document.querySelector('.album-cover-large img');
+            
+            // 检查是否已解锁，更新UI状态
+            if (isAlbumUnlocked(albumId)) {
+                if (lockOverlay) lockOverlay.classList.add('hidden');
+                if (coverImg) {
+                    coverImg.classList.remove('blurred');
+                    coverImg.classList.add('unlocked');
+                }
+            } else {
+                // 锁定状态，显示遮罩
+                if (lockOverlay) lockOverlay.classList.remove('hidden');
+                if (coverImg) {
+                    coverImg.classList.add('blurred');
+                    coverImg.classList.remove('unlocked');
+                }
+            }
+        }
+        
+        // 初始化解锁按钮事件（只绑定一次）
+        function initUnlockButton() {
+            if (window.__ALBUM_UNLOCK_INIT__) return;
+            window.__ALBUM_UNLOCK_INIT__ = true;
+            
+            const container = document.querySelector('.album-detail-container');
+            if (!container) return;
+            
+            const albumId = container.dataset.albumId;
+            const lockKey = container.dataset.lockKey;
+            
+            const lockOverlay = document.getElementById('album-lock-overlay');
+            const unlockInput = document.getElementById('album-unlock-input');
+            const unlockBtn = document.getElementById('album-unlock-btn');
+            const unlockError = document.getElementById('album-unlock-error');
+            const coverImg = document.querySelector('.album-cover-large img');
+            
+            // 解锁按钮事件
+            unlockBtn?.addEventListener('click', () => {
+                if (!unlockInput || !lockKey) return;
+                
+                const inputKey = unlockInput.value.trim();
+                if (inputKey === lockKey) {
+                    saveUnlockedAlbum(albumId);
+                    if (lockOverlay) lockOverlay.classList.add('hidden');
+                    if (coverImg) {
+                        coverImg.classList.remove('blurred');
+                        coverImg.classList.add('unlocked');
+                    }
+                } else {
+                    if (unlockError) unlockError.textContent = '密钥错误，请重试';
+                    if (unlockInput) {
+                        unlockInput.value = '';
+                        unlockInput.focus();
+                    }
+                }
+            });
+            
+            // 回车解锁
+            unlockInput?.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    unlockBtn?.click();
+                }
+            });
+        }
+        
+        // 初始化锁定检查
+        initAlbumLock();
+        initUnlockButton();
+        
+        // 支持 Astro View Transitions
+        document.addEventListener('astro:page-load', () => {
+            initAlbumLock();
+            initUnlockButton();
+        });
     </script>
 </BaseLayout>
 
@@ -537,6 +712,163 @@ const head = {
         .play-song-btn {
             width: 28px;
             height: 28px;
+        }
+    }
+
+    /* 专辑锁定遮罩 */
+    .album-lock-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(255, 255, 255, 0.95);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(10px);
+    }
+
+    .album-lock-overlay.hidden {
+        display: none;
+    }
+
+    .album-lock-content {
+        background: white;
+        border-radius: 20px;
+        padding: 3em;
+        width: 90%;
+        max-width: 400px;
+        box-shadow: 0 20px 80px rgba(0, 0, 0, 0.15);
+        text-align: center;
+        animation: lockSlideIn 0.4s ease;
+    }
+
+    @keyframes lockSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-30px) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .album-lock-icon {
+        color: var(--accent);
+        margin-bottom: 1em;
+    }
+
+    .album-lock-title {
+        margin: 0 0 0.5em 0;
+        font-size: 1.5em;
+        color: rgb(var(--black));
+    }
+
+    .album-lock-hint {
+        color: rgb(var(--gray));
+        margin: 0 0 1.5em 0;
+        font-size: 1em;
+    }
+
+    .album-unlock-input {
+        width: 100%;
+        padding: 1em;
+        border: 2px solid rgb(var(--gray-light));
+        border-radius: 12px;
+        font-size: 1em;
+        font-family: inherit;
+        box-sizing: border-box;
+        transition: all 0.2s ease;
+        margin-bottom: 1.5em;
+        text-align: center;
+    }
+
+    .album-unlock-input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 4px rgba(35, 55, 255, 0.1);
+    }
+
+    .album-lock-buttons {
+        display: flex;
+        gap: 1em;
+    }
+
+    .album-lock-btn {
+        flex: 1;
+        padding: 1em 1.2em;
+        border: none;
+        border-radius: 12px;
+        font-size: 1em;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .album-lock-btn-back {
+        background: rgb(var(--gray-light));
+        color: rgb(var(--gray));
+    }
+
+    .album-lock-btn-back:hover {
+        background: rgb(var(--gray));
+        color: white;
+    }
+
+    .album-lock-btn-unlock {
+        background: var(--accent);
+        color: white;
+    }
+
+    .album-lock-btn-unlock:hover {
+        background: var(--accent-dark);
+        transform: translateY(-2px);
+    }
+
+    .album-unlock-error {
+        color: #e74c3c;
+        text-align: center;
+        margin: 1em 0 0 0;
+        font-size: 0.9em;
+        min-height: 1.4em;
+    }
+
+    .album-cover-large img.blurred {
+        filter: blur(15px);
+        transition: filter 0.5s ease;
+    }
+
+    .album-cover-large img.unlocked {
+        filter: blur(0);
+    }
+
+    @media (max-width: 720px) {
+        .album-lock-content {
+            padding: 2em 1.5em;
+        }
+
+        .album-lock-title {
+            font-size: 1.3em;
+        }
+
+        .album-lock-hint {
+            font-size: 0.9em;
+        }
+
+        .album-unlock-input {
+            padding: 0.8em;
+        }
+
+        .album-lock-buttons {
+            flex-direction: column;
+        }
+
+        .album-lock-btn {
+            padding: 0.9em;
         }
     }
 </style>

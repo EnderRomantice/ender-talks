@@ -25,21 +25,63 @@ const head = {
             ) : (
                 <div class="albums-grid">
                     {albums.map((album) => (
-                        <a href={`/music/${album.id}`} class="album-card">
-                            <div class="album-cover">
-                                <img src={album.cover} alt={album.title} />
-                                <div class="play-overlay">
-                                    <svg viewBox="0 0 24 24" width="48" height="48">
-                                        <path fill="currentColor" d="M8 5v14l11-7z"/>
-                                    </svg>
+                        <div 
+                            class={`album-card ${album.lock ? 'locked' : ''}`}
+                            data-album-id={album.id}
+                            data-lock-key={album.lock?.key || ''}
+                            data-lock-hint={album.lock?.hint || ''}
+                        >
+                            <a href={album.lock ? undefined : `/music/${album.id}`} class="album-link">
+                                <div class="album-cover">
+                                    <img src={album.cover} alt={album.title} class={album.lock ? 'blurred' : ''} />
+                                    {!album.lock && (
+                                        <div class="play-overlay">
+                                            <svg viewBox="0 0 24 24" width="48" height="48">
+                                                <path fill="currentColor" d="M8 5v14l11-7z"/>
+                                            </svg>
+                                        </div>
+                                    )}
+                                    {album.lock && (
+                                        <div class="lock-overlay">
+                                            <svg class="lock-icon" viewBox="0 0 24 24" width="48" height="48">
+                                                <path fill="currentColor" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                                            </svg>
+                                            <span class="lock-hint">{album.lock.hint || '需要密钥'}</span>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                            <div class="album-info">
-                                <h3 class="album-title">{album.title}</h3>
-                                <p class="album-artist" title={album.description}>{album.description}</p>
-                            </div>
-                        </a>
+                                <div class="album-info">
+                                    <h3 class="album-title">{album.title}</h3>
+                                    <p class="album-artist" title={album.description}>{album.description}</p>
+                                </div>
+                            </a>
+                        </div>
                     ))}
+                </div>
+                
+                <!-- 解锁弹窗 -->
+                <div id="unlock-modal" class="unlock-modal hidden">
+                    <div class="unlock-modal-content">
+                        <div class="unlock-modal-header">
+                            <svg class="unlock-modal-icon" viewBox="0 0 24 24" width="32" height="32">
+                                <path fill="currentColor" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+                            </svg>
+                            <h3 class="unlock-modal-title">输入密钥解锁</h3>
+                        </div>
+                        <p class="unlock-modal-hint"></p>
+                        <input 
+                            type="password" 
+                            id="unlock-input" 
+                            class="unlock-input" 
+                            placeholder="请输入密钥..."
+                            autocomplete="off"
+                        />
+                        <div class="unlock-modal-buttons">
+                            <button id="unlock-cancel" class="unlock-btn unlock-btn-cancel">取消</button>
+                            <button id="unlock-confirm" class="unlock-btn unlock-btn-confirm">解锁</button>
+                        </div>
+                        <p id="unlock-error" class="unlock-error"></p>
+                    </div>
                 </div>
             )}
         </section>
@@ -103,6 +145,12 @@ const head = {
         transition: transform 0.2s ease, box-shadow 0.2s ease;
         text-decoration: none;
         color: inherit;
+    }
+    
+    .album-link {
+        text-decoration: none;
+        color: inherit;
+        display: block;
     }
     
     .album-cover {
@@ -241,4 +289,336 @@ const head = {
             font-size: 0.75em;
         }
     }
+
+    /* 锁定专辑样式 */
+    .album-card.locked {
+        cursor: pointer;
+    }
+
+    .album-card.locked .album-link {
+        pointer-events: none;
+    }
+
+    .album-cover img.blurred {
+        filter: blur(8px);
+        transition: filter 0.3s ease;
+    }
+
+    .album-card.locked:hover .album-cover img.blurred {
+        filter: blur(6px);
+    }
+
+    .lock-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .lock-icon {
+        color: white;
+        opacity: 0.9;
+    }
+
+    .lock-hint {
+        color: white;
+        font-size: 0.85em;
+        opacity: 0.8;
+        text-align: center;
+        padding: 0 1em;
+    }
+
+    /* 解锁弹窗样式 */
+    .unlock-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+
+    .unlock-modal.hidden {
+        display: none;
+    }
+
+    .unlock-modal-content {
+        background: white;
+        border-radius: 16px;
+        padding: 2em;
+        width: 90%;
+        max-width: 360px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: modalSlideIn 0.3s ease;
+    }
+
+    @keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-20px) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .unlock-modal-header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5em;
+        margin-bottom: 1em;
+    }
+
+    .unlock-modal-icon {
+        color: var(--accent);
+    }
+
+    .unlock-modal-title {
+        margin: 0;
+        font-size: 1.3em;
+        color: rgb(var(--black));
+    }
+
+    .unlock-modal-hint {
+        text-align: center;
+        color: rgb(var(--gray));
+        margin: 0 0 1em 0;
+        font-size: 0.9em;
+    }
+
+    .unlock-input {
+        width: 100%;
+        padding: 0.8em 1em;
+        border: 2px solid rgb(var(--gray-light));
+        border-radius: 8px;
+        font-size: 1em;
+        font-family: inherit;
+        box-sizing: border-box;
+        transition: border-color 0.2s ease;
+        margin-bottom: 1em;
+    }
+
+    .unlock-input:focus {
+        outline: none;
+        border-color: var(--accent);
+    }
+
+    .unlock-modal-buttons {
+        display: flex;
+        gap: 0.8em;
+    }
+
+    .unlock-btn {
+        flex: 1;
+        padding: 0.8em 1em;
+        border: none;
+        border-radius: 8px;
+        font-size: 1em;
+        font-family: inherit;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .unlock-btn-cancel {
+        background: rgb(var(--gray-light));
+        color: rgb(var(--gray));
+    }
+
+    .unlock-btn-cancel:hover {
+        background: rgb(var(--gray));
+        color: white;
+    }
+
+    .unlock-btn-confirm {
+        background: var(--accent);
+        color: white;
+    }
+
+    .unlock-btn-confirm:hover {
+        background: var(--accent-dark);
+    }
+
+    .unlock-error {
+        color: #e74c3c;
+        text-align: center;
+        margin: 0.8em 0 0 0;
+        font-size: 0.85em;
+        min-height: 1.2em;
+    }
 </style>
+
+<script>
+    // 解锁管理器
+    const UNLOCKED_ALBUMS_KEY = 'unlockedAlbums';
+
+    function getUnlockedAlbums() {
+        try {
+            const data = localStorage.getItem(UNLOCKED_ALBUMS_KEY);
+            return data ? JSON.parse(data) : [];
+        } catch {
+            return [];
+        }
+    }
+
+    function saveUnlockedAlbum(albumId) {
+        const unlocked = getUnlockedAlbums();
+        if (!unlocked.includes(albumId)) {
+            unlocked.push(albumId);
+            localStorage.setItem(UNLOCKED_ALBUMS_KEY, JSON.stringify(unlocked));
+        }
+    }
+
+    function isAlbumUnlocked(albumId) {
+        return getUnlockedAlbums().includes(albumId);
+    }
+
+    // 初始化已解锁的专辑
+    function initUnlockedAlbums() {
+        const unlockedAlbums = getUnlockedAlbums();
+        document.querySelectorAll('.album-card.locked').forEach(card => {
+            const albumId = card.getAttribute('data-album-id');
+            if (albumId && unlockedAlbums.includes(albumId)) {
+                unlockAlbum(card as HTMLElement);
+            }
+        });
+    }
+
+    // 解锁专辑UI
+    function unlockAlbum(card) {
+        card.classList.remove('locked');
+        const link = card.querySelector('.album-link');
+        const img = card.querySelector('img');
+        const lockOverlay = card.querySelector('.lock-overlay');
+        
+        if (link) link.removeAttribute('href');
+        if (img) img.classList.remove('blurred');
+        if (lockOverlay) lockOverlay.remove();
+        
+        // 添加播放覆盖层
+        const cover = card.querySelector('.album-cover');
+        if (cover) {
+            const playOverlay = document.createElement('div');
+            playOverlay.className = 'play-overlay';
+            playOverlay.innerHTML = `
+                <svg viewBox="0 0 24 24" width="48" height="48">
+                    <path fill="currentColor" d="M8 5v14l11-7z"/>
+                </svg>
+            `;
+            cover.appendChild(playOverlay);
+        }
+        
+        // 设置链接
+        const albumId = card.getAttribute('data-album-id');
+        if (link && albumId) {
+            link.href = `/music/${albumId}`;
+        }
+    }
+
+    // 弹窗管理
+    const modal = document.getElementById('unlock-modal');
+    const unlockInput = document.getElementById('unlock-input');
+    const unlockError = document.getElementById('unlock-error');
+    const unlockHint = document.querySelector('.unlock-modal-hint');
+    let currentCard = null;
+    let currentKey = '';
+
+    function showModal(card) {
+        currentCard = card;
+        currentKey = card.getAttribute('data-lock-key') || '';
+        const hint = card.getAttribute('data-lock-hint') || '需要密钥才能访问';
+        
+        if (unlockHint) unlockHint.textContent = hint;
+        if (unlockInput) unlockInput.value = '';
+        if (unlockError) unlockError.textContent = '';
+        if (modal) modal.classList.remove('hidden');
+        if (unlockInput) unlockInput.focus();
+    }
+
+    function hideModal() {
+        if (modal) modal.classList.add('hidden');
+        currentCard = null;
+        currentKey = '';
+    }
+
+    function handleUnlock() {
+        if (!unlockInput || !currentCard) return;
+        
+        const inputKey = unlockInput.value.trim();
+        if (inputKey === currentKey) {
+            const albumId = currentCard.getAttribute('data-album-id');
+            if (albumId) {
+                saveUnlockedAlbum(albumId);
+            }
+            unlockAlbum(currentCard);
+            hideModal();
+        } else {
+            if (unlockError) unlockError.textContent = '密钥错误，请重试';
+            if (unlockInput) {
+                unlockInput.value = '';
+                unlockInput.focus();
+            }
+        }
+    }
+
+    // 初始化函数
+    function init() {
+        // 先初始化已解锁状态
+        initUnlockedAlbums();
+
+        // 弹窗按钮事件
+        const cancelBtn = document.getElementById('unlock-cancel');
+        const confirmBtn = document.getElementById('unlock-confirm');
+
+        cancelBtn?.addEventListener('click', hideModal);
+        confirmBtn?.addEventListener('click', handleUnlock);
+
+        // 输入框回车事件
+        unlockInput?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleUnlock();
+            }
+        });
+
+        // 点击背景关闭弹窗
+        modal?.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                hideModal();
+            }
+        });
+
+        // ESC键关闭弹窗
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
+                hideModal();
+            }
+        });
+    }
+
+    // 页面加载时初始化
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+    
+    // 支持 Astro View Transitions
+    document.addEventListener('astro:page-load', init);
+    
+    // 使用事件委托处理锁定卡片点击（全局只需绑定一次）
+    document.addEventListener('click', (e) => {
+        const card = e.target.closest('.album-card.locked');
+        if (card) {
+            e.preventDefault();
+            e.stopPropagation();
+            showModal(card);
+        }
+    });
+</script>
