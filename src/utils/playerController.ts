@@ -200,9 +200,11 @@ class PlayerController {
             this.audio.play().catch(err => {
                 console.log('Auto-play prevented:', err);
                 s.isPlaying = false;
+                this.stopProgress();
                 this.emit('playStateChange', false);
                 this.options.onPlayStateChange?.(false);
             });
+            this.startProgress();
         }
         
         saveState(this.audio);

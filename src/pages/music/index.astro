@@ -594,39 +594,37 @@ const head = {
         initUnlockedAlbums();
 
         // 弹窗按钮事件（每次重新绑定，因为 DOM 可能已重建）
-        const cancelBtn = document.getElementById('unlock-cancel');
-        const confirmBtn = document.getElementById('unlock-confirm');
-        const unlockInput = getUnlockInput();
+        // 注意：必须先克隆 modal，然后再获取其中的按钮，否则按钮引用会失效
         const modal = getModal();
-
-        // 移除旧的事件监听器（如果有）
-        if (cancelBtn) {
-            cancelBtn.replaceWith(cancelBtn.cloneNode(true));
-            document.getElementById('unlock-cancel')?.addEventListener('click', hideModal);
-        }
-        if (confirmBtn) {
-            confirmBtn.replaceWith(confirmBtn.cloneNode(true));
-            document.getElementById('unlock-confirm')?.addEventListener('click', handleUnlock);
-        }
-
-        // 输入框回车事件
-        if (unlockInput) {
-            const newInput = unlockInput.cloneNode(true);
-            unlockInput.parentNode?.replaceChild(newInput, unlockInput);
-            newInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    handleUnlock();
-                }
-            });
-        }
-
-        // 点击背景关闭弹窗
+        
+        // 点击背景关闭弹窗 - 先克隆整个 modal
         if (modal) {
             const newModal = modal.cloneNode(true);
             modal.parentNode?.replaceChild(newModal, modal);
             newModal.addEventListener('click', (e) => {
                 if (e.target === newModal) {
                     hideModal();
+                }
+            });
+        }
+        
+        // 在克隆 modal 之后重新获取按钮元素并绑定事件
+        const cancelBtn = document.getElementById('unlock-cancel');
+        const confirmBtn = document.getElementById('unlock-confirm');
+        const unlockInput = getUnlockInput();
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', hideModal);
+        }
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', handleUnlock);
+        }
+
+        // 输入框回车事件
+        if (unlockInput) {
+            unlockInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleUnlock();
                 }
             });
         }
