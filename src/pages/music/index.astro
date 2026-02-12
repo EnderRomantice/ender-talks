@@ -522,18 +522,35 @@ const head = {
         }
     }
 
-    // 弹窗管理
-    const modal = document.getElementById('unlock-modal');
-    const unlockInput = document.getElementById('unlock-input');
-    const unlockError = document.getElementById('unlock-error');
-    const unlockHint = document.querySelector('.unlock-modal-hint');
+    // 弹窗管理 - 每次使用时重新获取 DOM 元素（支持 Astro View Transitions）
     let currentCard = null;
     let currentKey = '';
+
+    function getModal() {
+        return document.getElementById('unlock-modal');
+    }
+
+    function getUnlockInput() {
+        return document.getElementById('unlock-input') as HTMLInputElement;
+    }
+
+    function getUnlockError() {
+        return document.getElementById('unlock-error');
+    }
+
+    function getUnlockHint() {
+        return document.querySelector('.unlock-modal-hint');
+    }
 
     function showModal(card) {
         currentCard = card;
         currentKey = card.getAttribute('data-lock-key') || '';
         const hint = card.getAttribute('data-lock-hint') || '需要密钥才能访问';
+        
+        const modal = getModal();
+        const unlockInput = getUnlockInput();
+        const unlockError = getUnlockError();
+        const unlockHint = getUnlockHint();
         
         if (unlockHint) unlockHint.textContent = hint;
         if (unlockInput) unlockInput.value = '';
@@ -543,12 +560,14 @@ const head = {
     }
 
     function hideModal() {
+        const modal = getModal();
         if (modal) modal.classList.add('hidden');
         currentCard = null;
         currentKey = '';
     }
 
     function handleUnlock() {
+        const unlockInput = getUnlockInput();
         if (!unlockInput || !currentCard) return;
         
         const inputKey = unlockInput.value.trim();
@@ -560,6 +579,7 @@ const head = {
             unlockAlbum(currentCard);
             hideModal();
         } else {
+            const unlockError = getUnlockError();
             if (unlockError) unlockError.textContent = '密钥错误，请重试';
             if (unlockInput) {
                 unlockInput.value = '';
@@ -573,33 +593,43 @@ const head = {
         // 先初始化已解锁状态
         initUnlockedAlbums();
 
-        // 弹窗按钮事件
+        // 弹窗按钮事件（每次重新绑定，因为 DOM 可能已重建）
         const cancelBtn = document.getElementById('unlock-cancel');
         const confirmBtn = document.getElementById('unlock-confirm');
+        const unlockInput = getUnlockInput();
+        const modal = getModal();
 
-        cancelBtn?.addEventListener('click', hideModal);
-        confirmBtn?.addEventListener('click', handleUnlock);
+        // 移除旧的事件监听器（如果有）
+        if (cancelBtn) {
+            cancelBtn.replaceWith(cancelBtn.cloneNode(true));
+            document.getElementById('unlock-cancel')?.addEventListener('click', hideModal);
+        }
+        if (confirmBtn) {
+            confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+            document.getElementById('unlock-confirm')?.addEventListener('click', handleUnlock);
+        }
 
         // 输入框回车事件
-        unlockInput?.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                handleUnlock();
-            }
-        });
+        if (unlockInput) {
+            const newInput = unlockInput.cloneNode(true);
+            unlockInput.parentNode?.replaceChild(newInput, unlockInput);
+            newInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleUnlock();
+                }
+            });
+        }
 
         // 点击背景关闭弹窗
-        modal?.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                hideModal();
-            }
-        });
-
-        // ESC键关闭弹窗
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) {
-                hideModal();
-            }
-        });
+        if (modal) {
+            const newModal = modal.cloneNode(true);
+            modal.parentNode?.replaceChild(newModal, modal);
+            newModal.addEventListener('click', (e) => {
+                if (e.target === newModal) {
+                    hideModal();
+                }
+            });
+        }
     }
 
     // 页面加载时初始化
@@ -611,6 +641,16 @@ const head = {
     
     // 支持 Astro View Transitions
     document.addEventListener('astro:page-load', init);
+    
+    // ESC键关闭弹窗（全局事件，只需绑定一次）
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            const modal = getModal();
+            if (modal && !modal.classList.contains('hidden')) {
+                hideModal();
+            }
+        }
+    });
     
     // 使用事件委托处理锁定卡片点击（全局只需绑定一次）
     document.addEventListener('click', (e) => {
