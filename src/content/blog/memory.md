@@ -101,7 +101,7 @@ user: "你疯了吗？最喜欢怎么会有两个"
 
 1. 给每条记忆打上时间戳
 
-   ```python
+```python
    [2026-3-17] user最喜欢ts
    [2026-3-20] user最喜欢py
    
@@ -111,7 +111,7 @@ user: "你疯了吗？最喜欢怎么会有两个"
 
 2. 加一步检查, 专门用一个agent review
 
-   ```python
+```python
    [2026-3-20] user最喜欢py
    [2026-3-17] user最喜欢ts
    [memory_admin] 这个冲突了吧？结合user之前的记录，看上去他用py多些，存py吧
