@@ -237,7 +237,91 @@ class PlayerController {
         s.isPlaying = true;
         this.loadTrack(s.currentPlaylist[startIndex]);
         this.emit('playStateChange', true);
+        this.emit('playlistChange', s.currentPlaylist);
         this.options.onPlayStateChange?.(true);
+    }
+    
+    // Queue management
+    addToQueue(track: Track) {
+        const s = getState();
+        const playlistWasEmpty = s.currentPlaylist.length === 0;
+        
+        s.currentPlaylist.push(track);
+        saveState(this.audio || undefined);
+        this.emit('playlistChange', s.currentPlaylist);
+        
+        // If nothing was in the playlist, simulate playing it immediately
+        if (playlistWasEmpty) {
+            s.currentTrackIndex = 0;
+            s.isPlaying = true;
+            this.loadTrack(track);
+            this.emit('playStateChange', true);
+            this.options.onPlayStateChange?.(true);
+        }
+    }
+    
+    playFromQueue(index: number) {
+        const s = getState();
+        if (index >= 0 && index < s.currentPlaylist.length) {
+            s.currentTrackIndex = index;
+            s.isPlaying = true;
+            this.loadTrack(s.currentPlaylist[index]);
+            this.emit('playStateChange', true);
+            this.options.onPlayStateChange?.(true);
+        }
+    }
+    
+    removeFromQueue(index: number) {
+        const s = getState();
+        if (index < 0 || index >= s.currentPlaylist.length) return;
+        
+        s.currentPlaylist.splice(index, 1);
+        
+        // Adjust the index if we removed a track before or at the current playing track
+        if (s.currentPlaylist.length === 0) {
+            // Queue is now empty
+            s.currentTrackIndex = 0;
+            s.currentTrack = null;
+            if (this.audio) {
+                this.audio.pause();
+                this.audio.src = '';
+            }
+            s.isPlaying = false;
+            this.emit('playStateChange', false);
+            this.emit('trackChange', null);
+        } else {
+            if (index < s.currentTrackIndex) {
+                s.currentTrackIndex--;
+            } else if (index === s.currentTrackIndex) {
+                // If we removed the currently playing track, play the next one (which shifted to the same index)
+                // or if it was the last track, wrap around to 0
+                s.currentTrackIndex = s.currentTrackIndex % s.currentPlaylist.length;
+                this.loadTrack(s.currentPlaylist[s.currentTrackIndex]);
+                if (s.isPlaying) {
+                    this.audio?.play().catch(console.error);
+                }
+            }
+        }
+        
+        saveState(this.audio || undefined);
+        this.emit('playlistChange', s.currentPlaylist);
+    }
+    
+    clearQueue() {
+        const s = getState();
+        s.currentPlaylist = [];
+        s.currentTrackIndex = 0;
+        s.currentTrack = null;
+        if (this.audio) {
+            this.audio.pause();
+            this.audio.src = '';
+        }
+        s.isPlaying = false;
+        
+        saveState(this.audio || undefined);
+        this.emit('playStateChange', false);
+        this.emit('trackChange', null);
+        this.emit('playlistChange', s.currentPlaylist);
     }
     
     // Volume control

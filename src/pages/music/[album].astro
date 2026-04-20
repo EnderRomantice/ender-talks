@@ -78,14 +78,7 @@ const albumId = album.id;
         </div>
 
         <section class="playlist-section">
-            <h2>Playlist</h2>
-
             <div class="song-list" data-album={JSON.stringify(album)}>
-                <div class="song-list-header">
-                    <span class="song-number"> </span>
-                    <span class="song-title-header">Title</span>
-                </div>
-
                 {
                     album.songs.map((song, index) => (
                         <div
@@ -93,44 +86,34 @@ const albumId = album.id;
                             data-index={index}
                             data-title={song.title}
                         >
-                            <span class="song-number">
-                                <span class="number">{index + 1}</span>
-                                <button
-                                    class="play-song-btn"
-                                    data-index={index}
-                                >
-                                    <svg
-                                        viewBox="0 0 24 24"
-                                        width="20"
-                                        height="20"
-                                    >
-                                        <path
-                                            fill="currentColor"
-                                            d="M8 5v14l11-7z"
-                                        />
+                            <div class="song-info">
+                                <span class="song-index">{(index + 1).toString().padStart(2, '0')}</span>
+                                <div class="song-text">
+                                    <span class="song-title">
+                                        {song.title}
+                                        {song.isRecommended && (
+                                            <span class="recommended-star" title="Recommended">
+                                                <svg viewBox="0 0 24 24" width="14" height="14">
+                                                    <path fill="currentColor" d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                                                </svg>
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="song-actions">
+                                <button class="action-btn play-now-btn" title="Play Now" data-index={index}>
+                                    <svg viewBox="0 0 24 24" width="20" height="20">
+                                        <path fill="currentColor" d="M8 5v14l11-7z" />
                                     </svg>
                                 </button>
-                            </span>
-                            <span class="song-title">
-                                {song.title}
-                                {song.isRecommended && (
-                                    <span
-                                        class="recommended-star"
-                                        title="Recommended"
-                                    >
-                                        <svg
-                                            viewBox="0 0 24 24"
-                                            width="16"
-                                            height="16"
-                                        >
-                                            <path
-                                                fill="currentColor"
-                                                d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
-                                            />
-                                        </svg>
-                                    </span>
-                                )}
-                            </span>
+                                <button class="action-btn add-queue-btn" title="Add to Queue" data-index={index}>
+                                    <svg viewBox="0 0 24 24" width="20" height="20">
+                                        <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                     ))
                 }
@@ -234,6 +217,21 @@ const albumId = album.id;
             }
         }
 
+        function addToQueueAtIndex(index) {
+            if (isAlbumLocked()) return;
+            
+            const album = getAlbumFromDOM();
+            const song = album?.songs?.[index];
+            if (song && window.addToQueue) {
+                window.addToQueue({
+                    ...song,
+                    album: album.title,
+                    artist: album.artist,
+                    cover: album.cover
+                });
+            }
+        }
+
         // 使用事件委托到 document，只绑定一次
         if (!window.__ALBUM_PAGE_EVENTS_BOUND__) {
             window.__ALBUM_PAGE_EVENTS_BOUND__ = true;
@@ -247,19 +245,29 @@ const albumId = album.id;
                     return;
                 }
                 
-                // 播放按钮
-                const playBtn = e.target.closest('.play-song-btn');
-                if (playBtn) {
+                // Play Now 按钮
+                const playNowBtn = e.target.closest('.play-now-btn');
+                if (playNowBtn) {
                     e.preventDefault();
                     e.stopPropagation();
-                    const index = parseInt(playBtn.dataset.index);
+                    const index = parseInt(playNowBtn.dataset.index);
                     playSongAtIndex(index);
                     return;
                 }
+
+                // Add to Queue 按钮
+                const addQueueBtn = e.target.closest('.add-queue-btn');
+                if (addQueueBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const index = parseInt(addQueueBtn.dataset.index);
+                    addToQueueAtIndex(index);
+                    return;
+                }
                 
-                // 歌曲项（排除播放按钮）
+                // 歌曲项（整行点击默认播放）
                 const songItem = e.target.closest('.song-item');
-                if (songItem && !e.target.closest('.play-song-btn')) {
+                if (songItem && !e.target.closest('.action-btn')) {
                     e.preventDefault();
                     const index = parseInt(songItem.dataset.index);
                     playSongAtIndex(index);
@@ -484,102 +492,132 @@ const albumId = album.id;
     }
 
     .playlist-section {
-        margin-top: 2em;
-    }
-
-    .playlist-section h2 {
-        margin-bottom: 1em;
-        font-size: 1.5em;
+        margin-top: 4em;
     }
 
     .song-list {
-        background: white;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 2px 8px rgba(var(--gray), 15%);
-    }
-
-    .song-list-header {
-        display: grid;
-        grid-template-columns: 60px 1fr;
-        padding: 1em 1.5em;
-        background: rgb(var(--gray-light));
-        font-weight: 600;
-        font-size: 0.85em;
-        color: rgb(var(--gray));
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
     }
 
     .song-item {
-        display: grid;
-        grid-template-columns: 60px 1fr;
-        padding: 1em 1.5em;
+        display: flex;
+        justify-content: space-between;
         align-items: center;
-        border-bottom: 1px solid rgb(var(--gray-light));
+        padding: 1.25em 1em;
+        border-bottom: 1px solid rgba(var(--gray-light), 0.3);
+        transition: all 0.2s ease;
         cursor: pointer;
-        transition: background 0.2s ease;
-    }
-
-    .song-item:last-child {
-        border-bottom: none;
+        position: relative;
     }
 
     .song-item:hover {
-        background: rgba(var(--gray-light), 0.5);
+        background: rgba(var(--gray-light), 0.2);
+        padding-left: 1.5em;
     }
 
-    .song-item:hover .number {
-        display: none;
-    }
-
-    .song-item:hover .play-song-btn {
-        display: flex;
-    }
-
-    .song-number {
+    .song-info {
         display: flex;
         align-items: center;
-        justify-content: center;
+        gap: 1.5em;
+        min-width: 0;
+        flex: 1;
+    }
+
+    .song-index {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.8em;
         color: rgb(var(--gray));
-        font-size: 0.95em;
+        opacity: 0.5;
+        width: 2ch;
     }
 
-    .play-song-btn {
-        display: none;
-        background: var(--accent);
-        color: white;
-        border: none;
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: transform 0.2s ease;
-    }
-
-    .play-song-btn:hover {
-        transform: scale(1.1);
+    .song-text {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
     }
 
     .song-title {
+        font-size: 1.1em;
         font-weight: 500;
         color: rgb(var(--black));
+        display: flex;
+        align-items: center;
+        gap: 0.6em;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        padding-right: 1em;
-        display: flex;
-        align-items: center;
-        gap: 0.5em;
     }
 
     .recommended-star {
         color: #ffc107;
         flex-shrink: 0;
-        display: inline-flex;
+    }
+
+    .song-actions {
+        display: flex;
+        gap: 0.5em;
+        opacity: 0;
+        transform: translateX(10px);
+        transition: all 0.2s ease;
+    }
+
+    .song-item:hover .song-actions {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    .action-btn {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 1px solid rgba(var(--gray-light), 0.5);
+        background: white;
+        color: rgb(var(--gray-dark));
+        display: flex;
         align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .action-btn:hover {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+        transform: scale(1.1);
+    }
+
+    .play-now-btn {
+        border-color: rgba(var(--accent), 0.3);
+        color: var(--accent);
+    }
+
+    @media (max-width: 720px) {
+        .song-item {
+            padding: 1.1em 0.5em;
+        }
+        
+        .song-info {
+            gap: 1em;
+        }
+
+        .song-actions {
+            opacity: 1;
+            transform: none;
+            gap: 0.3em;
+        }
+
+        .action-btn {
+            width: 32px;
+            height: 32px;
+        }
+
+        .song-title {
+            font-size: 1em;
+        }
     }
 
     @media (max-width: 720px) {

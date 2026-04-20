@@ -77,12 +77,14 @@ export function loadState(): boolean {
     return false;
 }
 
-// Extend Window interface
 declare global {
     interface Window {
         __PLAYER_STATE__: PlayerState;
         playAlbum: (album: any, startIndex?: number) => void;
         playTrack: (track: any) => void;
         playTrackFromBox: (albumId: string, songTitle: string) => void;
+        addToQueue: (track: any) => void;
+        playFromQueue: (index: number) => void;
+        removeFromQueue: (index: number) => void;
     }
 }

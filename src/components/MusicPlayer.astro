@@ -2,14 +2,13 @@
 import PlayerShowButton from './PlayerShowButton.astro';
 ---
 
-<div id="floating-player" class="floating-player hidden" transition:persist="music-player">
-    <button class="toggle-btn" id="player-toggle-btn" title="Minimize">
-        <svg viewBox="0 0 24 24" width="16" height="16" class="toggle-icon">
-            <path fill="currentColor" d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
-        </svg>
-    </button>
-    
+<div id="music-app-root" class="music-app-root hidden" transition:persist="music-player">
     <div class="player-content">
+        <button class="close-btn" id="player-close-btn" title="Close">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+                <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+            </svg>
+        </button>
         <div class="now-playing">
             <div class="album-art">
                 <img id="player-album-art" src="" alt="Album Art" style="display: none;" />
@@ -46,8 +45,8 @@ import PlayerShowButton from './PlayerShowButton.astro';
                     <path fill="currentColor" d="M8 5v14l11-7z"/>
                 </svg>
                 <svg viewBox="0 0 24 24" width="32" height="32" id="pause-icon" style="display: none;">
-                    <path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/
->                </svg>
+                    <path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                </svg>
             </button>
             
             <button class="control-btn" id="next-btn" title="Next">
@@ -57,13 +56,31 @@ import PlayerShowButton from './PlayerShowButton.astro';
             </button>
         </div>
         
-        <div class="volume-container">
-            <button class="control-btn" id="mute-btn" title="Mute">
-                <svg viewBox="0 0 24 24" width="18" height="18" id="volume-icon">
-                    <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        <div class="bottom-controls">
+            <div class="volume-container">
+                <button class="control-btn" id="mute-btn" title="Mute">
+                    <svg viewBox="0 0 24 24" width="18" height="18" id="volume-icon">
+                        <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                    </svg>
+                </button>
+                <input type="range" id="volume-slider" min="0" max="100" value="40" />
+            </div>
+            
+            <button class="control-btn queue-toggle-btn" id="queue-toggle-btn" title="Playlist Queue">
+                <svg viewBox="0 0 24 24" width="18" height="18">
+                    <path fill="currentColor" d="M15 6H3v2h12V6zm0 4H3v2h12v-2zM3 16h8v-2H3v2zM17 6v8.18c-.31-.11-.65-.18-1-.18-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3V8h3V6h-5z"/>
                 </svg>
             </button>
-            <input type="range" id="volume-slider" min="0" max="100" value="40" />
+        </div>
+        
+        <div class="queue-drawer hidden" id="queue-drawer">
+            <div class="queue-header">
+                <h4>Up Next</h4>
+                <button id="clear-queue-btn">Clear</button>
+            </div>
+            <ul class="queue-list" id="queue-list">
+                <!-- Items injected by JS -->
+            </ul>
         </div>
     </div>
 </div>
@@ -79,7 +96,7 @@ import PlayerShowButton from './PlayerShowButton.astro';
     // DOM Elements cache
     const elements = {
         player: null as HTMLElement | null,
-        toggleBtn: null as HTMLElement | null,
+        closeBtn: null as HTMLElement | null,
         playBtn: null as HTMLElement | null,
         prevBtn: null as HTMLElement | null,
         nextBtn: null as HTMLElement | null,
@@ -96,6 +113,10 @@ import PlayerShowButton from './PlayerShowButton.astro';
         pauseIcon: null as HTMLElement | null,
         volumeIcon: null as HTMLElement | null,
         audio: null as HTMLAudioElement | null,
+        queueToggleBtn: null as HTMLElement | null,
+        queueDrawer: null as HTMLElement | null,
+        queueList: null as HTMLElement | null,
+        clearQueueBtn: null as HTMLElement | null,
     };
     
     // Get controller
@@ -103,8 +124,8 @@ import PlayerShowButton from './PlayerShowButton.astro';
     
     // Get all elements from DOM
     function getElements() {
-        elements.player = document.getElementById('floating-player');
-        elements.toggleBtn = document.getElementById('player-toggle-btn');
+        elements.player = document.getElementById('music-app-root');
+        elements.closeBtn = document.getElementById('player-close-btn');
         elements.playBtn = document.getElementById('play-btn');
         elements.prevBtn = document.getElementById('prev-btn');
         elements.nextBtn = document.getElementById('next-btn');
@@ -121,6 +142,10 @@ import PlayerShowButton from './PlayerShowButton.astro';
         elements.pauseIcon = document.getElementById('pause-icon');
         elements.volumeIcon = document.getElementById('volume-icon');
         elements.audio = document.getElementById('persistent-audio') as HTMLAudioElement;
+        elements.queueToggleBtn = document.getElementById('queue-toggle-btn');
+        elements.queueDrawer = document.getElementById('queue-drawer');
+        elements.queueList = document.getElementById('queue-list');
+        elements.clearQueueBtn = document.getElementById('clear-queue-btn');
     }
     
     // Update UI based on state
@@ -137,7 +162,16 @@ import PlayerShowButton from './PlayerShowButton.astro';
     }
     
     function updateTrackInfo(track: Track | null) {
-        if (!track) return;
+        // Redrer queue to update playing status
+        renderQueue(controller.getState().currentPlaylist);
+
+        if (!track) {
+            if (elements.title) elements.title.textContent = 'Select a song';
+            if (elements.artist) elements.artist.textContent = 'Click to play';
+            if (elements.albumArt) elements.albumArt.style.display = 'none';
+            if (elements.placeholder) elements.placeholder.style.display = 'flex';
+            return;
+        }
         
         if (elements.title) elements.title.textContent = track.title;
         if (elements.artist) elements.artist.textContent = track.artist || 'Unknown Artist';
@@ -152,6 +186,68 @@ import PlayerShowButton from './PlayerShowButton.astro';
             if (elements.albumArt) elements.albumArt.style.display = 'none';
             if (elements.placeholder) elements.placeholder.style.display = 'flex';
         }
+    }
+
+    function renderQueue(playlist: Track[]) {
+        if (!elements.queueList) return;
+        
+        const state = controller.getState();
+        const currentIndex = state.currentTrackIndex;
+
+        if (playlist.length === 0) {
+            elements.queueList.innerHTML = '<li class="queue-empty">Your queue is empty</li>';
+            return;
+        }
+
+        elements.queueList.innerHTML = playlist.map((track, index) => {
+            const isActive = index === currentIndex;
+            return `
+                <li class="queue-item ${isActive ? 'active' : ''}" data-index="${index}">
+                    <div class="queue-info">
+                        <div class="queue-thumbnail">
+                            ${track.cover ? `<img src="${track.cover}" alt="" />` : `<div class="queue-thumbnail-placeholder"></div>`}
+                            ${isActive ? `
+                                <div class="playing-overlay">
+                                    <div class="playing-indicator">
+                                        <span></span><span></span><span></span>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                        <div class="queue-text">
+                            <span class="queue-title">${track.title}</span>
+                            <span class="queue-artist">${track.artist || 'Unknown'}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="queue-actions">
+                        <button class="action-btn remove-btn" data-index="${index}" title="Remove">
+                            <svg viewBox="0 0 24 24" width="14" height="14">
+                                <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                            </svg>
+                        </button>
+                    </div>
+                </li>
+            `;
+        }).join('');
+
+        // Bind clicks to items
+        elements.queueList.querySelectorAll('.queue-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                if ((e.target as HTMLElement).closest('.action-btn')) return;
+                const index = parseInt((item as HTMLElement).dataset.index || '0');
+                controller.playFromQueue(index);
+            });
+        });
+
+        // Bind remove buttons
+        elements.queueList.querySelectorAll('.remove-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const index = parseInt((btn as HTMLElement).dataset.index || '0');
+                controller.removeFromQueue(index);
+            });
+        });
     }
     
     function updatePlayButton(isPlaying: boolean) {
@@ -200,8 +296,8 @@ import PlayerShowButton from './PlayerShowButton.astro';
     
     // Bind events
     function bindEvents() {
-        // Toggle visibility
-        controller.bindElement(elements.toggleBtn, 'click', () => {
+        // Close player
+        controller.bindElement(elements.closeBtn, 'click', () => {
             controller.toggleVisibility();
         });
         
@@ -230,6 +326,16 @@ import PlayerShowButton from './PlayerShowButton.astro';
             const value = parseInt((e.target as HTMLInputElement).value);
             controller.setVolume(value);
         });
+
+        // Queue Toggle
+        controller.bindElement(elements.queueToggleBtn, 'click', () => {
+            elements.queueDrawer?.classList.toggle('hidden');
+        });
+
+        // Clear Queue
+        controller.bindElement(elements.clearQueueBtn, 'click', () => {
+            controller.clearQueue();
+        });
         
         // Progress bar click
         const progressBar = document.querySelector('.progress-bar');
@@ -254,6 +360,7 @@ import PlayerShowButton from './PlayerShowButton.astro';
         controller.on('progress', updateProgress);
         controller.on('volumeChange', updateVolumeIcon);
         controller.on('muteChange', updateVolumeIcon);
+        controller.on('playlistChange', renderQueue);
         isSubscribed = true;
     }
     
@@ -265,6 +372,7 @@ import PlayerShowButton from './PlayerShowButton.astro';
         controller.off('progress', updateProgress);
         controller.off('volumeChange', updateVolumeIcon);
         controller.off('muteChange', updateVolumeIcon);
+        controller.off('playlistChange', renderQueue);
         isSubscribed = false;
     }
     
@@ -280,6 +388,7 @@ import PlayerShowButton from './PlayerShowButton.astro';
         updateTrackInfo(state.currentTrack);
         updatePlayButton(state.isPlaying);
         updateVolumeIcon();
+        renderQueue(state.currentPlaylist);
         
         // Restore progress bar immediately
         if (state.currentTrack && state.duration > 0) {
@@ -296,7 +405,7 @@ import PlayerShowButton from './PlayerShowButton.astro';
             
             // Only set src if it's different (avoid reloading)
             const needsReload = !elements.audio.src || 
-                               elements.audio.src !== new URL(state.currentTrack?.file || '', window.location.href).href;
+                                elements.audio.src !== new URL(state.currentTrack?.file || '', window.location.href).href;
             
             if (state.currentTrack?.file && needsReload) {
                 elements.audio.src = state.currentTrack.file;
@@ -349,6 +458,9 @@ import PlayerShowButton from './PlayerShowButton.astro';
     // Expose global functions for external use
     window.playAlbum = (album: any, startIndex?: number) => controller.playAlbum(album, startIndex);
     window.playTrack = (track: Track) => controller.playTrack(track);
+    window.addToQueue = (track: Track) => controller.addToQueue(track);
+    window.playFromQueue = (index: number) => controller.playFromQueue(index);
+    window.removeFromQueue = (index: number) => controller.removeFromQueue(index);
     window.playTrackFromBox = (albumId: string, songTitle: string) => {
         const albums = (window as any).__MUSIC_ALBUMS__;
         if (!albums) return;
@@ -367,240 +479,3 @@ import PlayerShowButton from './PlayerShowButton.astro';
         });
     };
 </script>
-
-<style>
-    .floating-player {
-        position: fixed;
-        top: 100px;
-        right: 20px;
-        width: 360px;
-        background: white;
-        border-radius: 16px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-        z-index: 1000;
-        transition: transform 0.3s ease, opacity 0.3s ease;
-    }
-    
-    .floating-player.hidden {
-        transform: translateX(calc(100% + 30px));
-        opacity: 0;
-        pointer-events: none;
-    }
-    
-    .floating-player.visible {
-        transform: translateX(0);
-        opacity: 1;
-    }
-    
-    .toggle-btn {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        width: 24px;
-        height: 24px;
-        background: transparent;
-        color: rgb(var(--gray));
-        border: none;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: color 0.2s ease;
-        z-index: 10;
-        opacity: 0.6;
-    }
-    
-    .toggle-btn:hover {
-        color: rgb(var(--black));
-        opacity: 1;
-    }
-    
-    .player-content {
-        padding: 1.2em;
-    }
-    
-    .now-playing {
-        display: flex;
-        align-items: center;
-        gap: 1em;
-        margin-bottom: 1em;
-        padding-right: 30px;
-    }
-    
-    .album-art {
-        position: relative;
-        width: 60px;
-        height: 60px;
-        flex-shrink: 0;
-    }
-    
-    .album-art img {
-        width: 100%;
-        height: 100%;
-        border-radius: 8px;
-        object-fit: cover;
-    }
-    
-    .album-art-placeholder {
-        width: 100%;
-        height: 100%;
-        border-radius: 8px;
-        background: rgb(var(--gray-light));
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: rgb(var(--gray));
-    }
-    
-    .track-info {
-        flex: 1;
-        min-width: 0;
-    }
-    
-    .track-info h3 {
-        margin: 0 0 0.2em 0;
-        font-size: 1em;
-        color: rgb(var(--black));
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    
-    .track-info p {
-        margin: 0;
-        color: rgb(var(--gray));
-        font-size: 0.85em;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    
-    .progress-container {
-        display: flex;
-        align-items: center;
-        gap: 0.5em;
-        margin-bottom: 0.8em;
-    }
-    
-    .time {
-        font-size: 0.75em;
-        color: rgb(var(--gray));
-        min-width: 35px;
-        text-align: center;
-    }
-    
-    .progress-bar {
-        flex: 1;
-        height: 4px;
-        background: rgb(var(--gray-light));
-        border-radius: 2px;
-        cursor: pointer;
-        position: relative;
-        overflow: hidden;
-    }
-    
-    .progress-fill {
-        height: 100%;
-        background: var(--accent);
-        border-radius: 2px;
-        transition: width 0.1s linear;
-        width: 0%;
-    }
-    
-    .controls {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        gap: 1em;
-        margin-bottom: 0.8em;
-    }
-    
-    .control-btn {
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: rgb(var(--gray-dark));
-        transition: color 0.2s ease, transform 0.2s ease;
-        padding: 0.3em;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    
-    .control-btn:hover {
-        color: var(--accent);
-        transform: scale(1.1);
-    }
-    
-    .play-btn {
-        background: var(--accent);
-        color: white !important;
-        border-radius: 50%;
-        width: 44px;
-        height: 44px;
-    }
-    
-    .play-btn:hover {
-        background: var(--accent-dark);
-    }
-    
-    .volume-container {
-        display: flex;
-        align-items: center;
-        gap: 0.5em;
-        justify-content: center;
-        color: rgb(var(--gray));
-    }
-    
-    .volume-container input[type="range"] {
-        width: 100px;
-        height: 4px;
-        -webkit-appearance: none;
-        appearance: none;
-        background: rgb(var(--gray-light));
-        border-radius: 2px;
-        outline: none;
-    }
-    
-    .volume-container input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none;
-        appearance: none;
-        width: 12px;
-        height: 12px;
-        background: var(--accent);
-        border-radius: 50%;
-        cursor: pointer;
-    }
-    
-    .volume-container input[type="range"]::-moz-range-thumb {
-        width: 12px;
-        height: 12px;
-        background: var(--accent);
-        border-radius: 50%;
-        cursor: pointer;
-        border: none;
-    }
-    
-    @media (max-width: 720px) {
-        .floating-player {
-            left: 0;
-            right: 0;
-            top: auto;
-            bottom: 0;
-            width: 100%;
-            border-radius: 16px 16px 0 0;
-        }
-        
-        .floating-player.hidden {
-            transform: translateY(100%);
-        }
-        
-        .player-content {
-            padding: 1em;
-        }
-        
-        .now-playing {
-            padding-right: 35px;
-        }
-    }
-</style>
