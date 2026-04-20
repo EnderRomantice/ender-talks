@@ -8,6 +8,16 @@ const posts = (await getCollection('blog')).sort(
 	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
 );
 
+const timelinePosts = posts
+	.filter((post) => post.data.category === 'lyrics')
+	.sort((a, b) => {
+		const numA = parseFloat(a.data.title) || 0;
+		const numB = parseFloat(b.data.title) || 0;
+		return numA - numB;
+	});
+
+const techPosts = posts.filter((post) => post.data.category !== 'lyrics');
+
 const head = {
   title: "Blog",
   description: ""
@@ -17,26 +27,78 @@ const head = {
 <BaseLayout title={head.title} description={head.description}>
 	<main>
 		<section>
-			<ul class="blog-content">
-				{
-					posts.map((post) => (
-						<li>
-							<a href={`/blog/${post.id}/`}>
-								{post.data.heroImage && (
-									<Image width={720} height={360} src={post.data.heroImage} alt="" />
-								)}
+			<div class="filters">
+				<input type="text" id="searchInput" placeholder="Search articles..." />
+				<div class="series-buttons">
+					<button class="series-btn active" data-series="tech">Tech</button>
+					<button class="series-btn" data-series="lyrics">7x7 Series</button>
+				</div>
+			</div>
+			
+			<div id="techTimelineContainer">
+				<ul class="timeline">
+					{
+						techPosts.map((post) => (
+							<li data-title={post.data.title.toLowerCase()}>
+								<a href={`/blog/${post.id}/`} class="timeline-content">
+									<div class="timeline-dot"></div>
+									<div class="timeline-meta">
+										<div class="meta-header">
+											<h4 class="title">{post.data.title}{post.data.language && <span class="lang">{post.data.language}</span>}</h4>
+											<p class="date"><FormattedDate date={post.data.pubDate} /></p>
+										</div>
+									</div>
+									{post.data.description && <p class="desc">{post.data.description}</p>}
+								</a>
+							</li>
+						))
+					}
+				</ul>
+			</div>
 
-								<h4 class="title">{post.data.title}<span class="lang">{post.data.language}</span></h4>
-								
-		
-								<p class="date">
-									<FormattedDate date={post.data.pubDate} />
-								</p>
-							</a>
-						</li>
-					))
-				}
-			</ul>
+			<div id="lyricsTimelineContainer" style="display: none;">
+				<ul class="timeline">
+					{
+						timelinePosts.map((post) => {
+							const isChapter = post.id.startsWith('chapter-');
+							// determine if post is basically empty (no lyrics yet)
+							const bodyClean = post.body
+								.replace(/import MusicBox from '\.\.\/\.\.\/components\/MusicBox\.astro'/g, '')
+								.replace(/<MusicBox album="7x7" song="[^"]+"\/>/g, '')
+								.trim();
+							const isEmpty = bodyClean.length === 0;
+							
+							return (
+								<li data-title={post.data.title.toLowerCase()} class={isChapter ? "timeline-chapter" : ""}>
+									{isEmpty ? (
+										<div class="timeline-content disabled">
+											<div class={isChapter ? "timeline-dot chapter-dot" : "timeline-dot"}></div>
+											<div class="timeline-meta">
+												{isChapter ? (
+													<h3 class="chapter-title">{post.data.title}</h3>
+												) : (
+													<h4 class="title">{post.data.title}</h4>
+												)}
+											</div>
+										</div>
+									) : (
+										<a href={`/blog/${post.id}/`} class="timeline-content">
+											<div class={isChapter ? "timeline-dot chapter-dot" : "timeline-dot"}></div>
+											<div class="timeline-meta">
+												{isChapter ? (
+													<h3 class="chapter-title">{post.data.title}</h3>
+												) : (
+													<h4 class="title">{post.data.title}</h4>
+												)}
+											</div>
+										</a>
+									)}
+								</li>
+							);
+						})
+					}
+				</ul>
+			</div>
 		</section>
 	</main>
 </BaseLayout>
@@ -46,78 +108,217 @@ const head = {
 		width: 960px;
 		margin: 0 auto;
 	}
-	ul {
+	.filters {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 2rem;
-		list-style-type: none;
-		margin: 0;
-		padding: 0;
+		flex-direction: column;
+		gap: 1.5rem;
+		margin-bottom: 3rem;
+		align-items: center;
 	}
-	ul li {
-		width: calc(50% - 1rem);
-	}
-	ul li * {
-		text-decoration: none;
-		transition: 0.2s ease;
-	}
-	ul li:first-child {
-		width: 100%;
-		margin-bottom: 1rem;
-		text-align: center;
-	}
-	ul li:first-child img {
-		width: 100%;
-	}
-	ul li:first-child .title {
-		font-size: 2.369rem;
-	}
-	ul li img {
-		margin-bottom: 0.5rem;
+	#searchInput {
+		padding: 0.75rem 1.25rem;
+		border: 1px solid rgb(var(--gray-light));
 		border-radius: 12px;
+		width: 100%;
+		max-width: 500px;
+		font-size: 1.1rem;
+		font-family: inherit;
+		background: rgba(var(--gray-light), 0.2);
+		color: rgb(var(--black));
+		transition: border-color 0.2s, box-shadow 0.2s;
 	}
-	ul li a {
+	#searchInput:focus {
+		outline: none;
+		border-color: var(--accent);
+		box-shadow: 0 0 0 2px #2337ff33;
+	}
+	.series-buttons {
+		display: flex;
+		gap: 0.75rem;
+		flex-wrap: wrap;
+		justify-content: center;
+	}
+	.series-btn {
+		padding: 0.5rem 1.5rem;
+		border: 1px solid rgb(var(--gray-light));
+		background: transparent;
+		border-radius: 20px;
+		cursor: pointer;
+		font-family: inherit;
+		font-size: 0.95rem;
+		color: rgb(var(--gray));
+		transition: all 0.2s ease;
+	}
+	.series-btn.active, .series-btn:hover {
+		background: var(--accent);
+		color: white;
+		border-color: var(--accent);
+	}
+	/* Timeline view styles */
+	.timeline {
+		list-style: none;
+		padding: 0;
+		margin: 2rem 0;
+		position: relative;
 		display: block;
 	}
-	.title {
-		margin: 0;
+	.timeline::before {
+		content: '';
+		position: absolute;
+		left: 0.5rem;
+		top: 0;
+		bottom: 0;
+		width: 1px;
+		background: rgb(var(--gray-light));
+	}
+	.timeline li {
+		position: relative;
+		margin-bottom: 0.5rem;
+		padding-left: 2rem;
+		width: 100%;
+		text-align: left;
+	}
+	.timeline-content {
+		display: block;
+		padding: 0.5rem 0;
+		text-decoration: none;
+	}
+	.timeline-content.disabled {
+		opacity: 0.35;
+		cursor: default;
+		pointer-events: none;
+	}
+	.timeline-content:hover .title {
+		color: var(--accent);
+	}
+	.timeline-dot {
+		position: absolute;
+		left: 0.25rem;
+		top: 1.1rem;
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: rgb(var(--gray-light));
+		z-index: 1;
+		transition: background 0.2s ease;
+	}
+	.timeline-content:hover .timeline-dot {
+		background: var(--accent);
+	}
+	.timeline-meta {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+	.timeline-meta .meta-header {
+		display: flex;
+		align-items: baseline;
+		gap: 1rem;
+	}
+	.timeline-meta .title {
 		color: rgb(var(--black));
-		line-height: 1;
-	}
-	.date {
+		font-size: 1.25rem;
 		margin: 0;
-		color: rgb(var(--gray));
+		transition: color 0.2s ease;
 	}
-	.lang {
+	.timeline-meta .date {
+		color: rgb(var(--gray));
+		font-size: 0.85em;
+		margin: 0;
+	}
+	.timeline-meta .lang {
 		margin-left: 0.5rem;
-		font-size: 0.875rem;
+		font-size: 0.8em;
 		color: rgb(var(--gray));
+		font-weight: normal;
 	}
-	ul li a:hover h4,
-	ul li a:hover .date {
-		color: rgb(var(--accent));
+	.timeline-content .desc {
+		margin: 0.5rem 0 0 0;
+		color: rgb(var(--gray));
+		font-size: 0.95em;
+		line-height: 1.5;
 	}
-	ul a:hover img {
-		box-shadow: var(--box-shadow);
+	.timeline-chapter {
+		margin-top: 1.5rem;
+		margin-bottom: 0.5rem;
 	}
-	@media (max-width: 720px) {
-		main {
-			width: 100%;
-			padding: 0 1em;
-			box-sizing: border-box;
-		}
-		ul {
-			gap: 0.5em;
-		}
-		ul li {
-			width: 100%;
-			text-align: center;
-		}
-		ul li:first-child {
-			margin-bottom: 0;
-		}
-		ul li:first-child .title {
-			font-size: 1.563em;
-		}
+	.timeline-chapter .timeline-meta {
+		padding-left: 0;
+	}
+	.chapter-title {
+		font-size: 1.85rem;
+		font-weight: 700;
+		color: rgb(var(--black));
+		margin: 0;
+		transition: color 0.2s ease;
+	}
+	.chapter-dot {
+		width: 12px;
+		height: 12px;
+		left: 0.125rem;
+		top: 1.25rem;
+		background: rgb(var(--gray-dark));
+	}
+	.timeline-content:hover .chapter-title {
+		color: var(--accent);
 	}
 </style>
+
+<script>
+	document.addEventListener('astro:page-load', () => {
+		const searchInput = document.getElementById('searchInput') as HTMLInputElement;
+		const seriesBtns = document.querySelectorAll('.series-btn');
+		
+		const techTimelineContainer = document.getElementById('techTimelineContainer');
+		const lyricsTimelineContainer = document.getElementById('lyricsTimelineContainer');
+		
+		if (!searchInput || !techTimelineContainer || !lyricsTimelineContainer) return;
+		
+		const techItems = techTimelineContainer.querySelectorAll('li');
+		const lyricsItems = lyricsTimelineContainer.querySelectorAll('li');
+		
+		let currentSeries = 'tech';
+		let searchText = '';
+
+		function filterPosts() {
+			if (currentSeries === 'lyrics') {
+				techTimelineContainer.style.display = 'none';
+				lyricsTimelineContainer.style.display = 'block';
+				
+				lyricsItems.forEach(item => {
+					const title = item.getAttribute('data-title') || '';
+					const matchesSearch = title.includes(searchText.toLowerCase());
+					item.style.display = matchesSearch ? '' : 'none';
+				});
+			} else {
+				lyricsTimelineContainer.style.display = 'none';
+				techTimelineContainer.style.display = 'block';
+				
+				techItems.forEach(item => {
+					const title = item.getAttribute('data-title') || '';
+					const matchesSearch = title.includes(searchText.toLowerCase());
+					item.style.display = matchesSearch ? '' : 'none';
+				});
+			}
+		}
+
+		searchInput.addEventListener('input', (e) => {
+			searchText = (e.target as HTMLInputElement).value;
+			filterPosts();
+		});
+
+		seriesBtns.forEach(btn => {
+			btn.addEventListener('click', (e) => {
+				const target = e.target as HTMLButtonElement;
+				currentSeries = target.getAttribute('data-series') || 'tech';
+				
+				seriesBtns.forEach(b => b.classList.remove('active'));
+				target.classList.add('active');
+				
+				filterPosts();
+			});
+		});
+		
+		filterPosts();
+	});
+</script>

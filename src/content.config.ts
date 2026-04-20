@@ -14,6 +14,7 @@ const blog = defineCollection({
       updatedDate: z.coerce.date().optional(),
 			language: z.string().optional(),
 			heroImage: image().optional(),
+			category: z.enum(['lyrics', 'tech']).optional().default('tech'),
 		}),
 });
 
