@@ -6,6 +6,8 @@ export interface Song {
   duration: string;
   file: string;
   isRecommended: boolean;
+  hasLyrics: boolean;
+  lyricSlug?: string;
 }
 
 export interface Album {
@@ -252,6 +254,9 @@ function scanMusicDirectory(): Album[] {
         
         // Scan for audio files
         const songs: Song[] = [];
+        const BLOG_DIR = path.resolve(process.cwd(), 'src/content/blog');
+        const CHAPTER_HEADERS = ['乐', '哀', '怒', '喜', '恐', '惊', '乱'];
+
         for (const file of albumFiles) {
           const ext = path.extname(file).toLowerCase();
           if (AUDIO_EXTENSIONS.includes(ext)) {
@@ -260,13 +265,63 @@ function scanMusicDirectory(): Album[] {
             const duration = formatDuration(getAudioDuration(filePath));
             const isRecommended = readmeData.recommended.includes(title);
             
+            // Extract index from title (e.g. "1.1 一种生活调" -> "1.1")
+            const indexMatch = title.match(/^(\d+\.\d+)/);
+            const index = indexMatch ? indexMatch[1] : '';
+            
+            // Check if title is just a chapter header or if a blog post exists
+            const cleanTitle = title.replace(/^\d+\.\d+\s*/, '').trim();
+            const isChapterHeader = CHAPTER_HEADERS.includes(cleanTitle);
+            
+            let hasLyrics = isChapterHeader;
+            let lyricSlug = '';
+            
+            if (index) {
+              const standardSlug = index;
+              const chapterSlug = index.endsWith('.0') ? `chapter-${index.split('.')[0]}` : '';
+              
+              if (index.endsWith('.0') && fs.existsSync(path.join(BLOG_DIR, `${chapterSlug}.mdx`))) {
+                hasLyrics = true;
+                lyricSlug = chapterSlug;
+              } else if (fs.existsSync(path.join(BLOG_DIR, `${standardSlug}.mdx`))) {
+                hasLyrics = true;
+                lyricSlug = standardSlug;
+              } else if (fs.existsSync(path.join(BLOG_DIR, `${standardSlug}.md`))) {
+                hasLyrics = true;
+                lyricSlug = standardSlug;
+              }
+            }
+            
+            // Still check the isChapterHeader for "true" even if no slug found
+            if (isChapterHeader) hasLyrics = true;
+
             songs.push({
               title,
               duration,
               file: `/music/${entry.name}/${file}`,
-              isRecommended
+              isRecommended,
+              hasLyrics,
+              lyricSlug: lyricSlug || undefined
             });
           }
+        }
+        
+        // Sorting logic
+        if (entry.name === '7x7') {
+          songs.sort((a, b) => {
+            const getIndex = (t: string) => {
+              const m = t.match(/^(\d+\.\d+)/);
+              return m ? parseFloat(m[1]) : 999;
+            };
+            const idxA = getIndex(a.title);
+            const idxB = getIndex(b.title);
+            
+            // Special case: move 0.x indices (specifically 0.0 乱) to the end
+            if (idxA < 1 && idxB >= 1) return 1;
+            if (idxB < 1 && idxA >= 1) return -1;
+            
+            return idxA - idxB;
+          });
         }
         
         // Only add album if it has songs

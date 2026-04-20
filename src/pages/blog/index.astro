@@ -13,6 +13,9 @@ const timelinePosts = posts
 	.sort((a, b) => {
 		const numA = parseFloat(a.data.title) || 0;
 		const numB = parseFloat(b.data.title) || 0;
+		// Move 0.x indices to the end (after 7.x)
+		if (numA < 1 && numB >= 1) return 1;
+		if (numB < 1 && numA >= 1) return -1;
 		return numA - numB;
 	});
 
@@ -70,7 +73,7 @@ const head = {
 							
 							return (
 								<li data-title={post.data.title.toLowerCase()} class={isChapter ? "timeline-chapter" : ""}>
-									{isEmpty ? (
+									{(isEmpty && !isChapter) ? (
 										<div class="timeline-content disabled">
 											<div class={isChapter ? "timeline-dot chapter-dot" : "timeline-dot"}></div>
 											<div class="timeline-meta">
@@ -98,6 +101,10 @@ const head = {
 						})
 					}
 				</ul>
+				<div class="playlist-footer-notes">
+					<p>1. * 为正式版</p>
+					<p>2. 灰色歌曲代表未填充歌词，所有歌曲可以在 music/7x7 中听到</p>
+				</div>
 			</div>
 		</section>
 	</main>
@@ -261,6 +268,18 @@ const head = {
 	}
 	.timeline-content:hover .chapter-title {
 		color: var(--accent);
+	}
+	.playlist-footer-notes {
+		margin-top: 3rem;
+		padding: 1.5rem 0.5rem;
+		font-size: 0.85rem;
+		color: #999;
+		font-style: italic;
+		line-height: 1.6;
+		border-top: 1px solid rgba(var(--gray-light), 0.3);
+	}
+	.playlist-footer-notes p {
+		margin: 0.5rem 0;
 	}
 </style>
 

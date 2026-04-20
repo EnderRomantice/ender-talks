@@ -353,20 +353,26 @@ hr {
 }
 
 .queue-drawer {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    margin-top: 0;
-    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
     opacity: 1;
+    min-height: 0;
+    flex: 1; /* Restore participation in flex chain */
+    flex-shrink: 1;
 }
 
 .queue-drawer.hidden {
-    max-height: 0;
+    grid-template-rows: 0fr;
     opacity: 0;
     pointer-events: none;
+}
+
+.drawer-content {
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
 }
 
 .queue-header {
@@ -375,6 +381,7 @@ hr {
     align-items: center;
     padding: 1.5rem 1.25rem 0.75rem;
     background: white;
+    flex-shrink: 0;
 }
 
 .queue-header h4 {
@@ -416,6 +423,22 @@ hr {
 
 .queue-item:hover {
     background: rgba(var(--gray-light), 0.4);
+}
+
+.queue-item.no-lyrics {
+    color: #999;
+}
+
+.queue-item.no-lyrics .queue-title {
+    color: #999 !important;
+}
+
+.queue-item.no-lyrics.active {
+    color: inherit;
+}
+
+.queue-item.no-lyrics.active .queue-title {
+    color: #333 !important;
 }
 
 .queue-info {
@@ -462,6 +485,52 @@ hr {
     flex-direction: column;
     min-width: 0;
     gap: 2px;
+}
+
+.track-info h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: rgb(var(--black));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.artist-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.track-info p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: rgb(var(--gray));
+}
+
+.lyrics-card-link {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 2px 8px;
+    background: rgba(var(--accent), 0.1);
+    color: var(--accent);
+    border-radius: 4px;
+    font-size: 0.7rem;
+    text-decoration: none;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.2s ease;
+}
+
+.lyrics-card-link:hover {
+    background: var(--accent);
+    color: white;
+}
+
+.lyrics-card-link.hidden {
+    display: none;
 }
 
 .queue-title {
@@ -524,6 +593,27 @@ hr {
 .playing-indicator span:nth-child(1) { height: 60%; }
 .playing-indicator span:nth-child(2) { height: 100%; }
 .playing-indicator span:nth-child(3) { height: 40%; }
+
+.playlist-footer-notes {
+    margin-top: 2rem;
+    padding: 1.5rem 1rem;
+    font-size: 0.85rem;
+    color: #999;
+    font-style: italic;
+    line-height: 1.6;
+}
+
+.playlist-footer-notes p {
+    margin: 0.5rem 0;
+}
+
+.song-item.no-lyrics {
+    opacity: 0.6;
+}
+
+.song-item.no-lyrics .song-title {
+    color: #999 !important;
+}
 
 @media (max-width: 720px) {
     .music-app-root {

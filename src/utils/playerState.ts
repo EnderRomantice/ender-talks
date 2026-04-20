@@ -19,6 +19,8 @@ export interface Track {
     file: string;
     cover?: string;
     album?: string;
+    hasLyrics?: boolean;
+    lyricSlug?: string;
 }
 
 // Initialize global state if not exists

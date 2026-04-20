@@ -21,7 +21,15 @@ import PlayerShowButton from './PlayerShowButton.astro';
             
             <div class="track-info">
                 <h3 id="player-title">Select a song</h3>
-                <p id="player-artist">Click to play</p>
+                <div class="artist-row">
+                    <p id="player-artist">Click to play</p>
+                    <a id="player-lyrics-link" href="#" class="lyrics-card-link hidden" title="View Lyrics">
+                        <svg viewBox="0 0 24 24" width="14" height="14">
+                            <path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+                        </svg>
+                        <span>Lyrics</span>
+                    </a>
+                </div>
             </div>
         </div>
         
@@ -74,13 +82,15 @@ import PlayerShowButton from './PlayerShowButton.astro';
         </div>
         
         <div class="queue-drawer hidden" id="queue-drawer">
-            <div class="queue-header">
-                <h4>Up Next</h4>
-                <button id="clear-queue-btn">Clear</button>
+            <div class="drawer-content">
+                <div class="queue-header">
+                    <h4>Up Next</h4>
+                    <button id="clear-queue-btn">Clear</button>
+                </div>
+                <ul class="queue-list" id="queue-list">
+                    <!-- Items injected by JS -->
+                </ul>
             </div>
-            <ul class="queue-list" id="queue-list">
-                <!-- Items injected by JS -->
-            </ul>
         </div>
     </div>
 </div>
@@ -117,6 +127,7 @@ import PlayerShowButton from './PlayerShowButton.astro';
         queueDrawer: null as HTMLElement | null,
         queueList: null as HTMLElement | null,
         clearQueueBtn: null as HTMLElement | null,
+        lyricsLink: null as HTMLAnchorElement | null,
     };
     
     // Get controller
@@ -146,6 +157,7 @@ import PlayerShowButton from './PlayerShowButton.astro';
         elements.queueDrawer = document.getElementById('queue-drawer');
         elements.queueList = document.getElementById('queue-list');
         elements.clearQueueBtn = document.getElementById('clear-queue-btn');
+        elements.lyricsLink = document.getElementById('player-lyrics-link') as HTMLAnchorElement;
     }
     
     // Update UI based on state
@@ -173,7 +185,9 @@ import PlayerShowButton from './PlayerShowButton.astro';
             return;
         }
         
-        if (elements.title) elements.title.textContent = track.title;
+        if (elements.title) {
+            elements.title.textContent = track.title.replace('[正式版]', '*');
+        }
         if (elements.artist) elements.artist.textContent = track.artist || 'Unknown Artist';
         
         if (track.cover) {
@@ -185,6 +199,15 @@ import PlayerShowButton from './PlayerShowButton.astro';
         } else {
             if (elements.albumArt) elements.albumArt.style.display = 'none';
             if (elements.placeholder) elements.placeholder.style.display = 'flex';
+        }
+
+        if (elements.lyricsLink) {
+            if (track.lyricSlug) {
+                elements.lyricsLink.href = `/blog/${track.lyricSlug}/`;
+                elements.lyricsLink.classList.remove('hidden');
+            } else {
+                elements.lyricsLink.classList.add('hidden');
+            }
         }
     }
 
@@ -201,8 +224,11 @@ import PlayerShowButton from './PlayerShowButton.astro';
 
         elements.queueList.innerHTML = playlist.map((track, index) => {
             const isActive = index === currentIndex;
+            const noLyrics = !track.hasLyrics;
+            const displayTitle = track.title.replace('[正式版]', '*');
+            
             return `
-                <li class="queue-item ${isActive ? 'active' : ''}" data-index="${index}">
+                <li class="queue-item ${isActive ? 'active' : ''} ${noLyrics ? 'no-lyrics' : ''}" data-index="${index}">
                     <div class="queue-info">
                         <div class="queue-thumbnail">
                             ${track.cover ? `<img src="${track.cover}" alt="" />` : `<div class="queue-thumbnail-placeholder"></div>`}
@@ -215,12 +241,19 @@ import PlayerShowButton from './PlayerShowButton.astro';
                             ` : ''}
                         </div>
                         <div class="queue-text">
-                            <span class="queue-title">${track.title}</span>
+                            <span class="queue-title">${displayTitle}</span>
                             <span class="queue-artist">${track.artist || 'Unknown'}</span>
                         </div>
                     </div>
                     
                     <div class="queue-actions">
+                        ${track.lyricSlug ? `
+                            <a href="/blog/${track.lyricSlug}/" class="action-btn lyrics-btn" title="View Lyrics">
+                                <svg viewBox="0 0 24 24" width="14" height="14">
+                                    <path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+                                </svg>
+                            </a>
+                        ` : ''}
                         <button class="action-btn remove-btn" data-index="${index}" title="Remove">
                             <svg viewBox="0 0 24 24" width="14" height="14">
                                 <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>

@@ -231,7 +231,9 @@ class PlayerController {
             ...song,
             album: album.title,
             artist: album.artist,
-            cover: album.cover
+            cover: album.cover,
+            hasLyrics: song.hasLyrics,
+            lyricSlug: song.lyricSlug
         }));
         s.currentTrackIndex = startIndex;
         s.isPlaying = true;

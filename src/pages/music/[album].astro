@@ -82,7 +82,7 @@ const albumId = album.id;
                 {
                     album.songs.map((song, index) => (
                         <div
-                            class="song-item"
+                            class={`song-item ${!song.hasLyrics ? 'no-lyrics' : ''}`}
                             data-index={index}
                             data-title={song.title}
                         >
@@ -90,7 +90,7 @@ const albumId = album.id;
                                 <span class="song-index">{(index + 1).toString().padStart(2, '0')}</span>
                                 <div class="song-text">
                                     <span class="song-title">
-                                        {song.title}
+                                        {song.title.replace('[正式版]', '*')}
                                         {song.isRecommended && (
                                             <span class="recommended-star" title="Recommended">
                                                 <svg viewBox="0 0 24 24" width="14" height="14">
@@ -113,6 +113,13 @@ const albumId = album.id;
                                         <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
                                     </svg>
                                 </button>
+                                {song.lyricSlug && (
+                                    <a href={`/blog/${song.lyricSlug}/`} class="action-btn lyrics-btn" title="View Lyrics">
+                                        <svg viewBox="0 0 24 24" width="20" height="20">
+                                            <path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
+                                        </svg>
+                                    </a>
+                                )}
                             </div>
                         </div>
                     ))
