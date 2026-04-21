@@ -21,15 +21,7 @@ import PlayerShowButton from './PlayerShowButton.astro';
             
             <div class="track-info">
                 <h3 id="player-title">Select a song</h3>
-                <div class="artist-row">
-                    <p id="player-artist">Click to play</p>
-                    <a id="player-lyrics-link" href="#" class="lyrics-card-link hidden" title="View Lyrics">
-                        <svg viewBox="0 0 24 24" width="14" height="14">
-                            <path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
-                        </svg>
-                        <span>Lyrics</span>
-                    </a>
-                </div>
+                <p id="player-artist">Click to play</p>
             </div>
         </div>
         
@@ -127,7 +119,6 @@ import PlayerShowButton from './PlayerShowButton.astro';
         queueDrawer: null as HTMLElement | null,
         queueList: null as HTMLElement | null,
         clearQueueBtn: null as HTMLElement | null,
-        lyricsLink: null as HTMLAnchorElement | null,
     };
     
     // Get controller
@@ -157,7 +148,6 @@ import PlayerShowButton from './PlayerShowButton.astro';
         elements.queueDrawer = document.getElementById('queue-drawer');
         elements.queueList = document.getElementById('queue-list');
         elements.clearQueueBtn = document.getElementById('clear-queue-btn');
-        elements.lyricsLink = document.getElementById('player-lyrics-link') as HTMLAnchorElement;
     }
     
     // Update UI based on state
@@ -200,15 +190,6 @@ import PlayerShowButton from './PlayerShowButton.astro';
             if (elements.albumArt) elements.albumArt.style.display = 'none';
             if (elements.placeholder) elements.placeholder.style.display = 'flex';
         }
-
-        if (elements.lyricsLink) {
-            if (track.lyricSlug) {
-                elements.lyricsLink.href = `/blog/${track.lyricSlug}/`;
-                elements.lyricsLink.classList.remove('hidden');
-            } else {
-                elements.lyricsLink.classList.add('hidden');
-            }
-        }
     }
 
     function renderQueue(playlist: Track[]) {
@@ -247,13 +228,6 @@ import PlayerShowButton from './PlayerShowButton.astro';
                     </div>
                     
                     <div class="queue-actions">
-                        ${track.lyricSlug ? `
-                            <a href="/blog/${track.lyricSlug}/" class="action-btn lyrics-btn" title="View Lyrics">
-                                <svg viewBox="0 0 24 24" width="14" height="14">
-                                    <path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" />
-                                </svg>
-                            </a>
-                        ` : ''}
                         <button class="action-btn remove-btn" data-index="${index}" title="Remove">
                             <svg viewBox="0 0 24 24" width="14" height="14">
                                 <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>

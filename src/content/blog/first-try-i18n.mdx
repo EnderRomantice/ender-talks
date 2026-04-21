@@ -1,0 +1,67 @@
+---
+title: 'i18n的几种实现思路'
+description: 'first try i18n'
+pubDate: '4 21 2026'
+language: 'Chinese'
+category: 'tech'
+---
+### 起因
+
+最近项目上需要接入i18n，适配多种语言。
+
+我的理解，就是把硬编码字符抽离出来进行管理，每次根据选择语言动态导入。
+
+但是这样有一个问题：如果是服务端渲染，必须在用户看到之前就渲染好内容，那么该怎么动态导入呢，因此至少有一种默认语言。
+
+我们的前端技术栈是Next.js, 比较好的实践是直接用一个`[locale]`作为进入业务逻辑前的顶级路由，就像是：
+
+`https://localhost:3000/zh-CN/dashboard`
+
+什么语言一目了然，非常语义化，同时由于在渲染具体业务page之前已经通过路由确定过了语言，因此也不用担心上文提到的问题。
+
+即便用户直接用url进入某个页面，也可以自己控制语言的显示。
+
+不过由于我们的项目已经比较复杂了，这种方式会带来一些颠覆性改动，为了i18n一个功能进行这样庞大的变更不太合理，因此讨论后还是pass掉此方案。
+
+
+还有一种方式是cookie储存。
+具体的思路是把语言选项放在cookie, 向next网关请求的时候语言选项会被携带。
+
+```
+HTTP/1.1 200 OK
+Content-Type: text/html
+Set-Cookie: NEXT_LOCALE=zh-CN; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax
+Set-Cookie: sessionId=abc123xyz; Path=/; Secure
+```
+
+内部流程: 
+
+Request: 浏览器发送请求，Header 携带 Cookie: NEXT_LOCALE=zh-CN。
+
+Server (Next.js):
+
+在渲染组件之前，先执行 Middleware 或 getServerSideProps。
+
+读取 Cookie，拿到字符串 "zh-CN"。
+
+根据这个字符串，去 public/locales/zh-CN.json 加载对应的配置对象。
+
+Render: 服务器使用加载好的配置对象渲染 HTML。
+
+Response: 用户接收到的 HTML 已经是翻译好的内容
+
+这种方式相对轻量简单，不用做过多变更。
+
+seo的话，mentor提醒我，实际上我们maybe只有landing page需要，路由方案的seo全覆盖更适合文档和blog.
+
+因此路由方案失去了一个重要的意义（对我们而言）
+
+### 小结
+
+Next环境下的两种方案
+
+路由：每个页面单独语url，seo极好，自带持久化，但是需要在设计之初就考虑在架构中，否则后期改造成本高。
+
+cookie：轻量简单，不用做过多变更，需要额外处理持久化问题。
+
+
